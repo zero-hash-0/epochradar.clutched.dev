@@ -58,7 +58,7 @@ export default function AirdropCheckerClient() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [solPrice, setSolPrice] = useState<SolPriceResponse | null>(null);
   const [tickerItems, setTickerItems] = useState<TickerItem[]>(STATIC_TICKER);
-  const [shareBaseUrl, setShareBaseUrl] = useState("https://epochradar.vercel.app");
+  const [shareBaseUrl, setShareBaseUrl] = useState("https://epochradar.clutched.dev");
   const [profiles, setProfiles] = useState<WalletProfileGroup[]>([]);
   const [newProfileName, setNewProfileName] = useState("");
   const [newWalletAddress, setNewWalletAddress] = useState("");
