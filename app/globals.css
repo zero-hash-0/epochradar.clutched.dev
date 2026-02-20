@@ -1839,3 +1839,22 @@ a:hover {
   .explorer-grid { grid-template-columns: repeat(2, 1fr); }
   .summary-grid  { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── White hairline border fix (mobile Safari) ── */
+@media (max-width: 840px) {
+  .portfolio-board {
+    border-color: rgba(255,255,255,0.06);
+  }
+  .board-top {
+    border-bottom-color: rgba(255,255,255,0.06);
+  }
+  .board-left {
+    border-bottom-color: rgba(255,255,255,0.06) !important;
+  }
+  .news-banner {
+    border-color: rgba(255,255,255,0.06);
+  }
+  .top-nav {
+    border-bottom-color: rgba(255,255,255,0.06);
+  }
+}

@@ -1,6 +1,7 @@
 /**
  * Draws a shareable airdrop results card onto a canvas.
- * Uses Solana brand colors: #9945FF (purple) + #14F195 (green).
+ * Features: SpongeBob art bottom-right, bold Solana gradient headline,
+ * frosted glass panels, rain of $ symbols, confetti dots.
  */
 
 export type ShareCardData = {
@@ -12,16 +13,13 @@ export type ShareCardData = {
   solPrice?: number;
 };
 
-// Solana brand palette
-const SOL_PURPLE = "#9945FF";
-const SOL_GREEN  = "#14F195";
-const SOL_TEAL   = "#00C2FF";
+const PURPLE = "#9945FF";
+const GREEN  = "#14F195";
+const TEAL   = "#00C2FF";
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
-  x: number, y: number,
-  w: number, h: number,
-  r: number,
+  x: number, y: number, w: number, h: number, r: number,
 ) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -36,235 +34,288 @@ function roundRect(
   ctx.closePath();
 }
 
+/* Seeded pseudo-random so the confetti looks the same every render */
+function seededRand(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
 export function drawShareCard(
   canvas: HTMLCanvasElement,
   data: ShareCardData,
+  bgImage?: HTMLImageElement,
 ): void {
-  const W = 800;
-  const H = 440;
-  canvas.width = W;
+  const W = 900;
+  const H = 480;
+  canvas.width  = W;
   canvas.height = H;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  /* ── Background ── */
-  ctx.fillStyle = "#0a0a0a";
+  const rand = seededRand(42);
+
+  /* ── 1. Dark background ── */
+  ctx.fillStyle = "#070710";
   ctx.fillRect(0, 0, W, H);
 
-  /* ── Solana ambient glows ── */
-  // Purple top-left
-  const g1 = ctx.createRadialGradient(-40, -40, 0, -40, -40, 420);
-  g1.addColorStop(0, "rgba(153,69,255,0.28)");
-  g1.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = g1;
+  /* ── 2. Ambient glows ── */
+  const gPurple = ctx.createRadialGradient(0, 0, 0, 0, 0, 500);
+  gPurple.addColorStop(0, "rgba(153,69,255,0.35)");
+  gPurple.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = gPurple;
   ctx.fillRect(0, 0, W, H);
 
-  // Green bottom-right
-  const g2 = ctx.createRadialGradient(W + 40, H + 40, 0, W + 40, H + 40, 380);
-  g2.addColorStop(0, "rgba(20,241,149,0.22)");
-  g2.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = g2;
+  const gGreen = ctx.createRadialGradient(W, H, 0, W, H, 480);
+  gGreen.addColorStop(0, "rgba(20,241,149,0.3)");
+  gGreen.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = gGreen;
   ctx.fillRect(0, 0, W, H);
 
-  // Teal mid
-  const g3 = ctx.createRadialGradient(W * 0.55, H * 0.2, 0, W * 0.55, H * 0.2, 250);
-  g3.addColorStop(0, "rgba(0,194,255,0.10)");
-  g3.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = g3;
+  const gTeal = ctx.createRadialGradient(W * 0.5, 0, 0, W * 0.5, 0, 350);
+  gTeal.addColorStop(0, "rgba(0,194,255,0.15)");
+  gTeal.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = gTeal;
   ctx.fillRect(0, 0, W, H);
 
-  /* ── Gradient border ── */
+  /* ── 3. Floating $ rain (behind everything) ── */
+  const symbols = ["$", "◎", "🪂", "$", "$", "◎", "$"];
+  for (let i = 0; i < 38; i++) {
+    const sx   = rand() * W;
+    const sy   = rand() * H;
+    const size = 9 + rand() * 22;
+    const alpha = 0.04 + rand() * 0.13;
+    const sym = symbols[Math.floor(rand() * symbols.length)];
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = `${size}px -apple-system, sans-serif`;
+    ctx.fillStyle = [GREEN, TEAL, PURPLE, "#fff"][Math.floor(rand() * 4)];
+    ctx.textAlign = "center";
+    ctx.fillText(sym, sx, sy);
+    ctx.restore();
+  }
+
+  /* ── 4. SpongeBob image — right side, bottom-anchored ── */
+  if (bgImage) {
+    const imgW = 320;
+    const imgH = (bgImage.naturalHeight / bgImage.naturalWidth) * imgW;
+    const imgX = W - imgW + 10;
+    const imgY = H - imgH + 20;
+
+    // Clip to right half so it doesn't obscure text
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(W * 0.46, 0, W * 0.54, H);
+    ctx.clip();
+
+    // Fade mask: transparent on left edge, opaque on right
+    const fadeGrad = ctx.createLinearGradient(W * 0.46, 0, W * 0.56, 0);
+    fadeGrad.addColorStop(0, "rgba(0,0,0,0)");
+    fadeGrad.addColorStop(1, "rgba(0,0,0,1)");
+
+    // Draw image
+    ctx.globalAlpha = 0.85;
+    ctx.drawImage(bgImage, imgX, imgY, imgW, imgH);
+
+    // Overlay fade on left edge of image
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = fadeGrad;
+    ctx.fillRect(W * 0.46, 0, 90, H);
+
+    ctx.restore();
+  }
+
+  /* ── 5. Left content panel (frosted glass) ── */
   ctx.save();
-  const borderGrad = ctx.createLinearGradient(0, 0, W, H);
-  borderGrad.addColorStop(0, "rgba(153,69,255,0.5)");
-  borderGrad.addColorStop(0.5, "rgba(0,194,255,0.3)");
-  borderGrad.addColorStop(1, "rgba(20,241,149,0.5)");
-  ctx.strokeStyle = borderGrad;
-  ctx.lineWidth = 1.5;
-  roundRect(ctx, 1, 1, W - 2, H - 2, 20);
+  roundRect(ctx, 24, 20, W * 0.52, H - 40, 18);
+  ctx.fillStyle = "rgba(7,7,16,0.72)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.07)";
+  ctx.lineWidth = 1;
   ctx.stroke();
   ctx.restore();
 
-  /* ── Top bar ── */
-  ctx.fillStyle = "rgba(255,255,255,0.03)";
-  roundRect(ctx, 20, 18, W - 40, 54, 12);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.06)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  /* Solana logo mark — two colored circles */
-  const dotX = 46, dotY = 45;
-  // Purple circle
-  ctx.fillStyle = SOL_PURPLE;
+  /* ── 6. Top bar inside panel ── */
+  // Logo dot — Solana style (purple filled, green ring)
+  ctx.fillStyle = PURPLE;
   ctx.beginPath();
-  ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
+  ctx.arc(50, 52, 7, 0, Math.PI * 2);
   ctx.fill();
-  // Green ring
-  ctx.strokeStyle = SOL_GREEN;
+  ctx.strokeStyle = GREEN;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(dotX, dotY, 10, 0, Math.PI * 2);
+  ctx.arc(50, 52, 11, 0, Math.PI * 2);
   ctx.stroke();
 
-  // "EpochRadar"
-  ctx.font = "700 17px ui-monospace, 'SF Mono', Menlo, monospace";
+  ctx.font = "700 16px ui-monospace, 'SF Mono', Menlo, monospace";
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
-  ctx.fillText("EpochRadar", 66, 50);
+  ctx.fillText("EpochRadar", 68, 57);
 
-  // Powered by Solana badge
-  const badgeText = "Powered by Solana";
-  ctx.font = "500 11px -apple-system, sans-serif";
-  const bw = ctx.measureText(badgeText).width + 20;
-  roundRect(ctx, 82, 54, bw, 16, 4);
-  ctx.fillStyle = `${SOL_PURPLE}30`;
-  ctx.fill();
-  ctx.fillStyle = SOL_PURPLE;
-  ctx.textAlign = "left";
-  ctx.fillText(badgeText, 92, 66);
-
-  // Wallet address
-  const walletLabel = data.walletAddress
-    ? `${data.walletAddress.slice(0, 6)}...${data.walletAddress.slice(-4)}`
+  // Wallet chip
+  const wallet = data.walletAddress
+    ? `${data.walletAddress.slice(0, 5)}…${data.walletAddress.slice(-4)}`
     : "Demo wallet";
-  ctx.font = "500 12px ui-monospace, 'SF Mono', Menlo, monospace";
-  const ww = ctx.measureText(walletLabel).width + 24;
-  roundRect(ctx, W - 20 - ww - 4, 28, ww, 30, 8);
-  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.font = "500 11px ui-monospace, monospace";
+  const chipW = ctx.measureText(wallet).width + 22;
+  roundRect(ctx, 68, 63, chipW, 18, 5);
+  ctx.fillStyle = "rgba(153,69,255,0.2)";
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.fillStyle = "#666";
-  ctx.textAlign = "center";
-  ctx.fillText(walletLabel, W - 20 - ww / 2 - 4, 48);
-
-  /* ── Main headline ── */
+  ctx.fillStyle = PURPLE;
   ctx.textAlign = "left";
-  ctx.font = "400 13px -apple-system, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.4)";
-  ctx.fillText("Total airdrop value found", 34, 108);
+  ctx.fillText(wallet, 79, 76);
 
-  ctx.font = "700 54px -apple-system, sans-serif";
+  /* ── 7. Eyebrow ── */
+  ctx.font = "600 10px -apple-system, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.letterSpacing = "0.12em";
+  ctx.fillText("SOLANA AIRDROP RESULTS", 40, 115);
+  ctx.letterSpacing = "0";
+
+  /* ── 8. Big dollar value — 3-color gradient ── */
   const totalStr = `$${data.totalValue.toFixed(2)}`;
-  const headGrad = ctx.createLinearGradient(34, 118, 34 + ctx.measureText(totalStr).width, 174);
-  headGrad.addColorStop(0, SOL_PURPLE);
-  headGrad.addColorStop(0.5, SOL_TEAL);
-  headGrad.addColorStop(1, SOL_GREEN);
-  ctx.fillStyle = headGrad;
-  ctx.fillText(totalStr, 34, 172);
+  ctx.font = "800 64px -apple-system, BlinkMacSystemFont, sans-serif";
+  const tw = ctx.measureText(totalStr).width;
+  const grad = ctx.createLinearGradient(40, 120, 40 + tw, 185);
+  grad.addColorStop(0,   PURPLE);
+  grad.addColorStop(0.45, TEAL);
+  grad.addColorStop(1,   GREEN);
+  ctx.fillStyle = grad;
+  ctx.textAlign = "left";
+  ctx.fillText(totalStr, 40, 183);
 
-  /* ── Stats pills ── */
+  // Subtitle
+  ctx.font = "400 13px -apple-system, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.42)";
+  ctx.fillText("worth of airdrops found on Solana", 42, 205);
+
+  /* ── 9. Stats row ── */
   const stats = [
-    { label: "Eligible",  value: String(data.eligibleCount),                         color: SOL_GREEN,  bg: "rgba(20,241,149,0.10)",  border: "rgba(20,241,149,0.28)"  },
-    { label: "Likely",    value: String(data.likelyCount),                            color: SOL_TEAL,   bg: "rgba(0,194,255,0.10)",   border: "rgba(0,194,255,0.28)"   },
-    { label: "Airdrops",  value: String(data.eligibleCount + data.likelyCount),       color: SOL_PURPLE, bg: "rgba(153,69,255,0.10)",  border: "rgba(153,69,255,0.28)"  },
+    { label: "Eligible",  val: data.eligibleCount,                       color: GREEN  },
+    { label: "Likely",    val: data.likelyCount,                          color: TEAL   },
+    { label: "Total",     val: data.eligibleCount + data.likelyCount,     color: PURPLE },
   ];
 
-  let px = 34;
-  for (const stat of stats) {
-    ctx.font = "600 11px -apple-system, sans-serif";
-    const lw = ctx.measureText(stat.label).width;
-    ctx.font = "700 16px -apple-system, sans-serif";
-    const vw = ctx.measureText(stat.value).width;
-    const pillW = Math.max(lw, vw) + 36;
-    const pillH = 52;
-    const py = 194;
-
-    roundRect(ctx, px, py, pillW, pillH, 10);
-    ctx.fillStyle = stat.bg;
+  let sx = 40;
+  for (const s of stats) {
+    const bw = 88, bh = 56, by = 220;
+    roundRect(ctx, sx, by, bw, bh, 10);
+    ctx.fillStyle = s.color + "18";
     ctx.fill();
-    ctx.strokeStyle = stat.border;
+    ctx.strokeStyle = s.color + "44";
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.font = "500 10.5px -apple-system, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.font = "500 10px -apple-system, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.38)";
     ctx.textAlign = "center";
-    ctx.fillText(stat.label, px + pillW / 2, py + 17);
+    ctx.fillText(s.label, sx + bw / 2, by + 16);
 
-    ctx.font = "700 18px -apple-system, sans-serif";
-    ctx.fillStyle = stat.color;
-    ctx.fillText(stat.value, px + pillW / 2, py + 40);
+    ctx.font = "700 22px -apple-system, sans-serif";
+    ctx.fillStyle = s.color;
+    ctx.fillText(String(s.val), sx + bw / 2, by + 42);
 
-    px += pillW + 10;
+    sx += bw + 8;
   }
 
-  /* ── Divider ── */
-  const divGrad = ctx.createLinearGradient(34, 0, W - 34, 0);
-  divGrad.addColorStop(0, "rgba(153,69,255,0.3)");
-  divGrad.addColorStop(0.5, "rgba(0,194,255,0.2)");
-  divGrad.addColorStop(1, "rgba(20,241,149,0.3)");
-  ctx.strokeStyle = divGrad;
+  /* ── 10. Gradient divider ── */
+  const divG = ctx.createLinearGradient(40, 0, 440, 0);
+  divG.addColorStop(0, PURPLE + "55");
+  divG.addColorStop(0.5, TEAL + "33");
+  divG.addColorStop(1, GREEN + "55");
+  ctx.strokeStyle = divG;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(34, 266);
-  ctx.lineTo(W - 34, 266);
+  ctx.moveTo(40, 292);
+  ctx.lineTo(440, 292);
   ctx.stroke();
 
-  /* ── Top airdrops ── */
-  ctx.font = "600 11px -apple-system, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.3)";
+  /* ── 11. Top airdrops row ── */
+  ctx.font = "600 10px -apple-system, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.28)";
   ctx.textAlign = "left";
-  ctx.fillText("TOP AIRDROPS", 34, 290);
+  ctx.fillText("TOP AIRDROPS", 40, 314);
 
-  const topItems = data.topAirdrops.slice(0, 4);
-  const colW = (W - 68) / Math.max(topItems.length, 1);
+  const top = data.topAirdrops.slice(0, 4);
+  const cardW = Math.min(88, (400 / Math.max(top.length, 1)) - 8);
 
-  topItems.forEach((item, i) => {
-    const ix = 34 + i * colW;
-    const iy = 304;
-    const iw = colW - 10;
-    const ih = 94;
+  top.forEach((item, i) => {
+    const cx = 40 + i * (cardW + 8);
+    const cy = 324;
+    const ch = 86;
+    const col = item.status === "Eligible" ? GREEN : item.status === "Likely" ? TEAL : PURPLE;
 
-    roundRect(ctx, ix, iy, iw, ih, 10);
-    ctx.fillStyle = "rgba(255,255,255,0.03)";
+    roundRect(ctx, cx, cy, cardW, ch, 9);
+    ctx.fillStyle = col + "12";
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.strokeStyle = col + "33";
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Logo circle with Solana gradient
-    const logoGrad = ctx.createLinearGradient(ix + 8, iy + 8, ix + 36, iy + 36);
-    logoGrad.addColorStop(0, SOL_PURPLE);
-    logoGrad.addColorStop(1, SOL_GREEN);
-    ctx.fillStyle = `rgba(153,69,255,0.15)`;
+    // Logo circle
+    ctx.fillStyle = col + "22";
     ctx.beginPath();
-    ctx.arc(ix + 22, iy + 24, 14, 0, Math.PI * 2);
+    ctx.arc(cx + 18, cy + 20, 12, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = logoGrad;
+    ctx.strokeStyle = col + "66";
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    ctx.font = "700 10px -apple-system, sans-serif";
-    ctx.fillStyle = SOL_GREEN;
+    ctx.font = "700 9px -apple-system, sans-serif";
+    ctx.fillStyle = col;
     ctx.textAlign = "center";
-    ctx.fillText(item.project.slice(0, 2).toUpperCase(), ix + 22, iy + 28);
+    ctx.fillText(item.project.slice(0, 2).toUpperCase(), cx + 18, cy + 24);
 
-    // Project name
-    ctx.font = "600 12px -apple-system, sans-serif";
+    // Name
+    ctx.font = "600 10px -apple-system, sans-serif";
     ctx.fillStyle = "#fff";
     ctx.textAlign = "left";
-    const name = item.project.length > 13 ? item.project.slice(0, 12) + "…" : item.project;
-    ctx.fillText(name, ix + 40, iy + 20);
+    const nm = item.project.length > 10 ? item.project.slice(0, 9) + "…" : item.project;
+    ctx.fillText(nm, cx + 6, cy + 46);
 
-    // Est value
-    const valColor = item.status === "Eligible" ? SOL_GREEN : item.status === "Likely" ? SOL_TEAL : SOL_PURPLE;
-    ctx.font = "500 11px -apple-system, sans-serif";
-    ctx.fillStyle = valColor;
-    ctx.fillText(item.estimatedValue ?? "TBD", ix + 40, iy + 36);
+    // Value
+    ctx.font = "500 9px -apple-system, sans-serif";
+    ctx.fillStyle = col;
+    ctx.fillText(item.estimatedValue ?? "TBD", cx + 6, cy + 60);
 
-    // Status badge
-    ctx.font = "600 10px -apple-system, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
-    ctx.fillText(item.status, ix + 12, iy + 76);
+    // Status pill
+    ctx.font = "600 8px -apple-system, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.fillText(item.status.toUpperCase(), cx + 6, cy + 77);
   });
 
-  /* ── Bottom watermark ── */
-  ctx.font = "500 11px ui-monospace, 'SF Mono', Menlo, monospace";
-  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  /* ── 12. Confetti dots scattered across card ── */
+  const confettiColors = [GREEN, TEAL, PURPLE, "#FFD700", "#FF6B6B"];
+  for (let i = 0; i < 28; i++) {
+    const cx2 = rand() * W;
+    const cy2 = rand() * H;
+    const r   = 1.5 + rand() * 3;
+    const alpha = 0.15 + rand() * 0.35;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = confettiColors[Math.floor(rand() * confettiColors.length)];
+    ctx.beginPath();
+    ctx.arc(cx2, cy2, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* ── 13. Gradient border on whole card ── */
+  const borderG = ctx.createLinearGradient(0, 0, W, H);
+  borderG.addColorStop(0,   PURPLE + "88");
+  borderG.addColorStop(0.5, TEAL   + "44");
+  borderG.addColorStop(1,   GREEN  + "88");
+  ctx.strokeStyle = borderG;
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, 1, 1, W - 2, H - 2, 20);
+  ctx.stroke();
+
+  /* ── 14. Watermark ── */
+  ctx.font = "500 11px ui-monospace, monospace";
+  ctx.fillStyle = "rgba(255,255,255,0.2)";
   ctx.textAlign = "center";
-  ctx.fillText("epochradar.com  ·  Solana Airdrop Checker", W / 2, H - 14);
+  ctx.fillText("epochradar.com  ·  Solana Airdrop Checker", W / 2, H - 12);
 }

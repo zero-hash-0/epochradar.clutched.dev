@@ -272,10 +272,9 @@ export default function AirdropCheckerClient() {
   /* ── Draw share card whenever modal opens ── */
   useEffect(() => {
     if (!showShare || !shareCanvasRef.current) return;
-    const eligible = tableRows.filter((r) => r.isEligible);
-    drawShareCard(shareCanvasRef.current, {
+    const cardData = {
       walletAddress,
-      eligibleCount: eligible.length,
+      eligibleCount: tableRows.filter((r) => r.isEligible).length,
       likelyCount: tableRows.filter((r) => r.status === "Likely").length,
       totalValue,
       topAirdrops: tableRows.slice(0, 4).map((r) => ({
@@ -284,7 +283,11 @@ export default function AirdropCheckerClient() {
         estimatedValue: r.estimatedValue,
       })),
       solPrice: solPrice?.priceUsd,
-    });
+    };
+    const img = new window.Image();
+    img.onload = () => drawShareCard(shareCanvasRef.current!, cardData, img);
+    img.onerror = () => drawShareCard(shareCanvasRef.current!, cardData);
+    img.src = "/share-bg.jpg";
   }, [showShare, tableRows, totalValue, walletAddress, solPrice]);
 
   const downloadShareCard = () => {
