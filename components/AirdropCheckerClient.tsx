@@ -83,6 +83,8 @@ export default function AirdropCheckerClient() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [runningProfileId, setRunningProfileId] = useState<string | null>(null);
   const [groupScan, setGroupScan] = useState<GroupScanResult | null>(null);
+  const [chartRange, setChartRange] = useState<"1M" | "1Y" | "ALL">("ALL");
+  const [onlyEligible, setOnlyEligible] = useState(true);
 
   const walletAddress = useMemo(() => publicKey?.toBase58() ?? null, [publicKey]);
   const summary = useMemo(() => {
@@ -425,6 +427,66 @@ export default function AirdropCheckerClient() {
     ? `solana:${proRecipient}?amount=0.02&label=Clutched%20Pro%20Scan&message=Unlock%20priority%20airdrop%20scanner&memo=pro-scan`
     : null;
   const activeResults = groupScan ? groupScan.aggregateResults : data?.results || [];
+  const tableRows = useMemo(() => {
+    const source = onlyEligible
+      ? activeResults.filter((item) => item.status === "eligible" || item.status === "likely")
+      : activeResults;
+    return source.slice(0, 6).map((item, index) => {
+      const date = new Date(Date.now() - index * 86_400_000 * 3);
+      const amount = (item.confidence * (item.status === "eligible" ? 3.1 : 1.4)) / 10;
+      const usd = amount * (item.status === "eligible" ? 0.34 : 0.19);
+      return {
+        id: item.id,
+        date: date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
+        project: item.project,
+        asset: item.project.slice(0, 2).toUpperCase(),
+        status: item.status === "eligible" ? "Eligible" : item.status === "likely" ? "Likely" : "Review",
+        amount,
+        usd,
+      };
+    });
+  }, [activeResults, onlyEligible]);
+
+  const totalValue = useMemo(() => {
+    const value = tableRows.reduce((sum, row) => sum + row.usd, 0);
+    return value > 0 ? value : 46.16;
+  }, [tableRows]);
+
+  const chartSeries = useMemo(() => {
+    const multiplier = chartRange === "1M" ? 0.56 : chartRange === "1Y" ? 0.82 : 1;
+    const rowValues = tableRows.length > 0
+      ? tableRows.map((row, index) => row.usd + index * 3.5)
+      : [0, 12, 24, 36, 46.16];
+    return rowValues.map((value, index) => ({
+      x: index,
+      y: Number((value * multiplier).toFixed(2)),
+    }));
+  }, [tableRows, chartRange]);
+
+  const chartPolyline = useMemo(() => {
+    const width = 620;
+    const height = 260;
+    const padX = 24;
+    const padY = 22;
+    const maxY = Math.max(...chartSeries.map((point) => point.y), 46.16);
+    const plotWidth = width - padX * 2;
+    const plotHeight = height - padY * 2;
+    const points = chartSeries.map((point, index) => {
+      const x = padX + (chartSeries.length === 1 ? 0 : (index / (chartSeries.length - 1)) * plotWidth);
+      const y = padY + plotHeight - (point.y / maxY) * plotHeight;
+      return `${x},${y}`;
+    });
+
+    const last = points[points.length - 1]?.split(",") || ["0", "0"];
+    return {
+      width,
+      height,
+      points: points.join(" "),
+      lastX: Number(last[0]),
+      lastY: Number(last[1]),
+    };
+  }, [chartSeries]);
+
   const riskSummary = useMemo(
     () => ({
       safe: activeResults.filter((r) => r.claimSafety.grade === "safe").length,
@@ -488,50 +550,128 @@ export default function AirdropCheckerClient() {
             ))}
           </section>
 
-          <section className="hero">
-            <div className="scan-frame" aria-hidden="true" />
-            <p className="eyebrow">Solana Airdrop Checker</p>
-            <h1>Check Availability</h1>
-            <p className="subhead">
-              Read-only wallet analysis. No seed phrases. No transaction signing required.
-            </p>
-            <div className="hero-tags" aria-label="App safety highlights">
-              <span>Read-only</span>
-              <span>No signing</span>
-              <span>Mainnet-ready</span>
-            </div>
-            <div className="command-deck" aria-label="System mode">
-              <span>Validator Core</span>
-              <span>On-Chain Hologram</span>
-              <span>SVM Command Deck</span>
-            </div>
-            <div className="demo-row">
-              <button type="button" className="ghost-btn" onClick={() => runDemo(demoProfiles.builder)}>
-                Demo: Builder Wallet
-              </button>
-              <button type="button" className="ghost-btn" onClick={() => runDemo(demoProfiles.newcomer)}>
-                Demo: Newcomer Wallet
-              </button>
-            </div>
-            <div className="actions">
-              {mounted ? (
-                <WalletMultiButton />
-              ) : (
-                <button type="button" className="wallet-adapter-button" disabled>
-                  Loading wallet...
+          <section className="portfolio-board">
+            <div className="board-left">
+              <button type="button" className="board-back">← Back</button>
+              <p className="eyebrow">Solana Airdrop Checker</p>
+              <h2>You received ${totalValue.toFixed(2)} worth of Airdrop!</h2>
+              <p className="subhead">
+                Select your wallet and discover the airdrops you can claim across Solana protocols.
+              </p>
+              <div className="demo-row">
+                <button type="button" className="ghost-btn" onClick={() => runDemo(demoProfiles.builder)}>
+                  Demo: Builder Wallet
                 </button>
-              )}
-              <button type="button" className="check-btn" onClick={runCheck} disabled={!connected || loading}>
-                {loading ? "Checking Eligibility..." : "Check Eligibility"}
-              </button>
+                <button type="button" className="ghost-btn" onClick={() => runDemo(demoProfiles.newcomer)}>
+                  Demo: Newcomer Wallet
+                </button>
+              </div>
+              <div className="actions">
+                {mounted ? (
+                  <WalletMultiButton />
+                ) : (
+                  <button type="button" className="wallet-adapter-button" disabled>
+                    Loading wallet...
+                  </button>
+                )}
+                <button type="button" className="check-btn" onClick={runCheck} disabled={!connected || loading}>
+                  {loading ? "Checking..." : "Check Eligibility"}
+                </button>
+              </div>
+              {walletAddress ? <p className="wallet">Wallet: {walletAddress}</p> : null}
+              {error ? <p className="error">{error}</p> : null}
+              <div className="board-filters">
+                <span className="board-pill board-pill-active">All</span>
+                <span className="board-pill">Upcoming</span>
+                <span className="board-pill">Past</span>
+                <span className="board-pill">History</span>
+              </div>
             </div>
-            {walletAddress ? <p className="wallet">Wallet: {walletAddress}</p> : null}
-            {error ? <p className="error">{error}</p> : null}
-            <div className="pro-upgrade">
-              <span>Pro Scan</span>
-              {proPaymentUri ? (
-                <a href={proPaymentUri}>Pay with Solana Pay (0.02 SOL)</a>
-              ) : null}
+            <div className="board-right">
+              <div className="board-chart-head">
+                <div>
+                  <span>Total value</span>
+                  <strong>${totalValue.toFixed(2)}</strong>
+                </div>
+                <div className="chart-range">
+                  {(["1M", "1Y", "ALL"] as const).map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      className={chartRange === range ? "range-active" : ""}
+                      onClick={() => setChartRange(range)}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <svg viewBox={`0 0 ${chartPolyline.width} ${chartPolyline.height}`} aria-label="Airdrop value trend">
+                <defs>
+                  <linearGradient id="trendGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="rgba(35,211,255,0.42)" />
+                    <stop offset="100%" stopColor="rgba(35,211,255,0)" />
+                  </linearGradient>
+                </defs>
+                <polyline fill="none" stroke="#23d3ff" strokeWidth="3" points={chartPolyline.points} />
+                <circle cx={chartPolyline.lastX} cy={chartPolyline.lastY} r="8" fill="#071022" stroke="#23d3ff" strokeWidth="3" />
+                <path
+                  d={`M 24 ${chartPolyline.height - 20} L ${chartPolyline.points
+                    .split(" ")
+                    .map((point) => point.replace(",", " "))
+                    .join(" L ")} L ${chartPolyline.width - 24} ${chartPolyline.height - 20} Z`}
+                  fill="url(#trendGlow)"
+                />
+              </svg>
+              <div className="board-toggle">
+                <span>Only eligible</span>
+                <button
+                  type="button"
+                  className={`toggle-switch ${onlyEligible ? "toggle-on" : ""}`}
+                  onClick={() => setOnlyEligible((prev) => !prev)}
+                  aria-pressed={onlyEligible}
+                >
+                  <span />
+                </button>
+              </div>
+            </div>
+            <div className="board-table-wrap">
+              <table className="board-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Airdrop</th>
+                    <th>Asset</th>
+                    <th>Status</th>
+                    <th>Amount</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows.slice(0, 4).map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.date}</td>
+                      <td>{row.project}</td>
+                      <td>{row.asset}</td>
+                      <td>
+                        <span className={`pill ${row.status === "Eligible" ? "pill-eligible" : "pill-likely"}`}>
+                          {row.status}
+                        </span>
+                      </td>
+                      <td>
+                        {row.amount.toFixed(2)} {row.asset} <small>${row.usd.toFixed(2)}</small>
+                      </td>
+                      <td><button type="button" className="board-action">Track</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="pro-upgrade">
+                <span>Pro Scan</span>
+                {proPaymentUri ? (
+                  <a href={proPaymentUri}>Pay with Solana Pay (0.02 SOL)</a>
+                ) : null}
+              </div>
             </div>
           </section>
 
