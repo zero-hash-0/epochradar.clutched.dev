@@ -24,16 +24,25 @@ type WalletProfileGroup = { id: string; name: string; wallets: string[]; created
 type WalletScan = { address: string; ok: boolean; error?: string; eligibleCount: number; likelyCount: number };
 type GroupScanResult = { profileName: string; checkedAt: string; walletScans: WalletScan[]; aggregateResults: AirdropEvaluation[] };
 
-const PROFILES_KEY = "airdrop_wallet_profiles_v1";
+const PROFILES_KEY  = "airdrop_wallet_profiles_v1";
+const PROFILE_PIC_KEY = "epochradar_profile_pic_v1";
 const NAV_TABS = ["Dashboard", "Airdrop Checker", "Address Book"] as const;
 type NavTab = (typeof NAV_TABS)[number];
 
-const AVATAR_COLORS = ["#14f195", "#23d3ff", "#9945ff", "#f97316", "#ec4899"];
-const CAT_COLORS: Record<string, string> = { defi: "#14f195", nft: "#9945ff", infrastructure: "#23d3ff", consumer: "#f97316" };
+const AVATAR_COLORS = ["#FFD700", "#14f195", "#23d3ff", "#9945ff", "#f97316", "#ec4899"];
+const CAT_COLORS: Record<string, string> = { defi: "#FFD700", nft: "#9945ff", infrastructure: "#23d3ff", consumer: "#f97316" };
 
 function avatarColor(addr: string) { return AVATAR_COLORS[addr.charCodeAt(0) % AVATAR_COLORS.length]; }
 function shortAddr(addr: string) { return `${addr.slice(0, 4)}...${addr.slice(-4)}`; }
 function isValid(address: string) { try { new PublicKey(address); return true; } catch { return false; } }
+
+/* Parse a "$X–$Y" range string and return midpoint number */
+function parseValueMid(val?: string): number {
+  if (!val) return 0;
+  const nums = val.match(/\d[\d,]*/g)?.map((n) => parseInt(n.replace(/,/g, ""), 10)) ?? [];
+  if (nums.length === 0) return 0;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
 
 /* ─── Fallback static ticker items ─────────────────── */
 const STATIC_TICKER: TickerItem[] = [
@@ -73,8 +82,11 @@ export default function AirdropCheckerClient() {
   const [showShare, setShowShare] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [shareDownloaded, setShareDownloaded] = useState(false);
+  const [shareSaved, setShareSaved] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [showInstall, setShowInstall] = useState(false);
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+  const profilePicInputRef = useRef<HTMLInputElement>(null);
   const shareCanvasRef = useRef<HTMLCanvasElement>(null);
   const [explorerFilter, setExplorerFilter] = useState<"all" | "defi" | "nft" | "infrastructure" | "consumer">("all");
 
@@ -90,6 +102,10 @@ export default function AirdropCheckerClient() {
       try {
         const raw = localStorage.getItem(PROFILES_KEY);
         if (raw) { const p = JSON.parse(raw) as WalletProfileGroup[]; if (Array.isArray(p)) setProfiles(p); }
+      } catch { /* ignore */ }
+      try {
+        const pic = localStorage.getItem(PROFILE_PIC_KEY);
+        if (pic) setProfilePic(pic);
       } catch { /* ignore */ }
     }
   }, []);
@@ -169,9 +185,14 @@ export default function AirdropCheckerClient() {
     });
   }, [activeResults, onlyEligible]);
 
+  /* Use midpoint of estimatedValue ranges for a realistic total */
   const totalValue = useMemo(() => {
-    const v = tableRows.reduce((s, r) => s + r.usd, 0);
-    return v > 0 ? v : 46.16;
+    if (tableRows.length === 0) return 0;
+    const v = tableRows.reduce((s, r) => {
+      const mid = parseValueMid(r.estimatedValue);
+      return s + (mid > 0 ? mid : r.usd);
+    }, 0);
+    return v;
   }, [tableRows]);
 
   const summary = useMemo(() => {
@@ -256,12 +277,9 @@ export default function AirdropCheckerClient() {
     setRunningProfileId(null);
   };
 
-  const handleShare = async () => {
-    const url = shareBaseUrl;
-    const text = `🪂 EpochRadar — I found ${tableRows.filter((r) => r.isEligible).length} eligible Solana airdrops worth $${totalValue.toFixed(2)}! Check yours:`;
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try { await navigator.share({ title: "EpochRadar Airdrop Checker", text, url }); return; } catch { /* fall through */ }
-    }
+  const handleShare = () => {
+    // Auto-save immediately + show preview modal
+    renderAndSave();
     setShowShare(true);
   };
 
@@ -269,32 +287,89 @@ export default function AirdropCheckerClient() {
     try { await navigator.clipboard.writeText(shareBaseUrl); setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); } catch { /* ignore */ }
   };
 
-  /* ── Draw share card whenever modal opens ── */
+  /* ── Build share card data ── */
+  const buildCardData = useCallback(() => ({
+    walletAddress,
+    eligibleCount: tableRows.filter((r) => r.isEligible).length,
+    likelyCount: tableRows.filter((r) => r.status === "Likely").length,
+    totalValue,
+    topAirdrops: tableRows.slice(0, 4).map((r) => ({
+      project: r.project,
+      status: r.status,
+      estimatedValue: r.estimatedValue,
+    })),
+    solPrice: solPrice?.priceUsd,
+    profilePic: profilePic ?? undefined,
+  }), [walletAddress, tableRows, totalValue, solPrice, profilePic]);
+
+  /* ── Draw onto hidden canvas then auto-save PNG ── */
+  const renderAndSave = useCallback(() => {
+    const canvas = shareCanvasRef.current;
+    if (!canvas) return;
+    const cardData = buildCardData();
+
+    const finish = (sponge?: HTMLImageElement, profImg?: HTMLImageElement) => {
+      drawShareCard(canvas, cardData, sponge, profImg);
+      // auto-save
+      const link = document.createElement("a");
+      link.download = `epochradar-${Date.now()}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      setShareSaved(true);
+      setTimeout(() => setShareSaved(false), 2500);
+    };
+
+    // Load SpongeBob bg
+    const sponge = new window.Image();
+    sponge.crossOrigin = "anonymous";
+    sponge.onload = () => {
+      if (profilePic) {
+        const profImg = new window.Image();
+        profImg.onload = () => finish(sponge, profImg);
+        profImg.onerror = () => finish(sponge);
+        profImg.src = profilePic;
+      } else {
+        finish(sponge);
+      }
+    };
+    sponge.onerror = () => {
+      if (profilePic) {
+        const profImg = new window.Image();
+        profImg.onload = () => finish(undefined, profImg);
+        profImg.onerror = () => finish();
+        profImg.src = profilePic;
+      } else {
+        finish();
+      }
+    };
+    sponge.src = "/share-bg.jpg";
+  }, [buildCardData, profilePic]);
+
+  /* ── Draw share card whenever modal opens (for preview) ── */
   useEffect(() => {
     if (!showShare || !shareCanvasRef.current) return;
-    const cardData = {
-      walletAddress,
-      eligibleCount: tableRows.filter((r) => r.isEligible).length,
-      likelyCount: tableRows.filter((r) => r.status === "Likely").length,
-      totalValue,
-      topAirdrops: tableRows.slice(0, 4).map((r) => ({
-        project: r.project,
-        status: r.status,
-        estimatedValue: r.estimatedValue,
-      })),
-      solPrice: solPrice?.priceUsd,
+    const cardData = buildCardData();
+    const sponge = new window.Image();
+    sponge.crossOrigin = "anonymous";
+    sponge.onload = () => {
+      if (profilePic) {
+        const profImg = new window.Image();
+        profImg.onload = () => drawShareCard(shareCanvasRef.current!, cardData, sponge, profImg);
+        profImg.onerror = () => drawShareCard(shareCanvasRef.current!, cardData, sponge);
+        profImg.src = profilePic;
+      } else {
+        drawShareCard(shareCanvasRef.current!, cardData, sponge);
+      }
     };
-    const img = new window.Image();
-    img.onload = () => drawShareCard(shareCanvasRef.current!, cardData, img);
-    img.onerror = () => drawShareCard(shareCanvasRef.current!, cardData);
-    img.src = "/share-bg.jpg";
-  }, [showShare, tableRows, totalValue, walletAddress, solPrice]);
+    sponge.onerror = () => drawShareCard(shareCanvasRef.current!, cardData);
+    sponge.src = "/share-bg.jpg";
+  }, [showShare, buildCardData, profilePic]);
 
   const downloadShareCard = () => {
     const canvas = shareCanvasRef.current;
     if (!canvas) return;
     const link = document.createElement("a");
-    link.download = "epochradar-airdrops.png";
+    link.download = `epochradar-${Date.now()}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
     setShareDownloaded(true);
@@ -309,6 +384,24 @@ export default function AirdropCheckerClient() {
       "noreferrer",
     );
     setShowShare(false);
+  };
+
+  /* ── Profile pic upload ── */
+  const handleProfilePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setProfilePic(dataUrl);
+      try { localStorage.setItem(PROFILE_PIC_KEY, dataUrl); } catch { /* ignore */ }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeProfilePic = () => {
+    setProfilePic(null);
+    try { localStorage.removeItem(PROFILE_PIC_KEY); } catch { /* ignore */ }
   };
 
   const handleInstall = async () => {
@@ -346,28 +439,43 @@ export default function AirdropCheckerClient() {
         <div className="glow-orb glow-orb-3" />
       </div>
 
+      {/* ── Auto-save toast ── */}
+      {shareSaved && (
+        <div className="save-toast">✓ Card saved to your downloads!</div>
+      )}
+
       {/* ── Share modal ── */}
       {showShare && (
         <div className="modal-backdrop" onClick={() => setShowShare(false)}>
           <div className="share-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="share-modal-header">
               <div>
-                <h2 className="modal-title">Share your results</h2>
-                <p className="modal-sub">Save your airdrop card or post it on X.</p>
+                <h2 className="modal-title">🏆 Your Airdrop Card</h2>
+                <p className="modal-sub">Image saved automatically. Share or post it below.</p>
               </div>
               <button type="button" className="modal-close" onClick={() => setShowShare(false)}>×</button>
             </div>
 
-            {/* Canvas preview */}
+            {/* Live canvas preview rendered inside modal */}
             <div className="share-canvas-wrap">
-              <canvas ref={shareCanvasRef} className="share-canvas" />
+              <canvas
+                ref={(el) => {
+                  // Sync ref — canvas is hidden elsewhere; this one is the preview
+                  if (el && shareCanvasRef.current && shareCanvasRef.current !== el) {
+                    el.width = shareCanvasRef.current.width;
+                    el.height = shareCanvasRef.current.height;
+                    el.getContext("2d")?.drawImage(shareCanvasRef.current, 0, 0);
+                  }
+                }}
+                className="share-canvas"
+              />
             </div>
 
             {/* Actions */}
             <div className="share-modal-actions">
               <button type="button" className="share-dl-btn" onClick={downloadShareCard}>
                 <span className="share-option-icon">⬇</span>
-                {shareDownloaded ? "Saved!" : "Save image"}
+                {shareDownloaded ? "Saved!" : "Save again"}
               </button>
               <button type="button" className="share-x-btn" onClick={shareCardToX}>
                 <span className="share-option-icon" style={{ fontFamily: "serif" }}>𝕏</span>
@@ -378,8 +486,6 @@ export default function AirdropCheckerClient() {
                 {shareCopied ? "Copied!" : "Copy link"}
               </button>
             </div>
-
-            {/* URL bar */}
             <div className="share-url-box">
               <input className="share-url-input" readOnly value={shareBaseUrl} />
             </div>
@@ -411,20 +517,38 @@ export default function AirdropCheckerClient() {
               </span>
             )}
             {mounted ? <WalletMultiButton /> : <button type="button" className="wallet-adapter-button" disabled>Loading…</button>}
-            {/* Avatar */}
+            {/* Avatar / Profile Pic */}
             {mounted && (
-              <div
-                className="avatar-ring"
-                style={{ background: `${avatarBg}18`, border: `1.5px solid ${avatarBg}55`, color: avatarBg }}
-                title={walletAddress ?? "Not connected"}
-              >
-                <div className="avatar-glow-ring" />
-                {avatarInitials}
+              <div className="avatar-wrap" title="Click to change profile picture" onClick={() => profilePicInputRef.current?.click()} style={{ cursor: "pointer" }}>
+                <input
+                  ref={profilePicInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={handleProfilePicChange}
+                />
+                {profilePic ? (
+                  <div className="avatar-ring avatar-ring-pic" style={{ border: `2px solid #FFD700`, padding: 0, overflow: "hidden" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={profilePic} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                  </div>
+                ) : (
+                  <div
+                    className="avatar-ring"
+                    style={{ background: `${avatarBg}22`, border: `1.5px solid #FFD70066`, color: "#FFD700" }}
+                  >
+                    <div className="avatar-glow-ring" />
+                    {avatarInitials}
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </nav>
+
+      {/* ── Hidden canvas for share card rendering ── */}
+      <canvas ref={shareCanvasRef} style={{ display: "none" }} />
 
       {/* ── Page ── */}
       <main className="page">
@@ -526,7 +650,10 @@ export default function AirdropCheckerClient() {
                   <button type="button" className="board-back">← Back</button>
                   <p className="board-eyebrow">Solana Airdrop Checker</p>
                   <h2 className="board-headline">
-                    You received <span style={{ color: "var(--brand)" }}>${totalValue.toFixed(2)}</span> worth of Airdrops!
+                    {totalValue > 0
+                      ? <>You have <span className="gold-value">${totalValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> in eligible airdrops!</>
+                      : <>Connect wallet to see <span className="gold-value">your airdrops</span></>
+                    }
                   </h2>
                   <p className="board-sub">
                     Connect your wallet and discover airdrops you can claim across Solana protocols. Read-only — no signing required.

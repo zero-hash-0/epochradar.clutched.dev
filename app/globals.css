@@ -1858,3 +1858,120 @@ a:hover {
     border-bottom-color: rgba(255,255,255,0.06);
   }
 }
+
+/* ═══════════════════════════════════════════════════
+   GOLD THEME ADDITIONS
+═══════════════════════════════════════════════════ */
+
+/* Gold gradient text for headline value */
+.gold-value {
+  background: linear-gradient(90deg, #FFE566 0%, #FFD700 40%, #FFA500 70%, #14F195 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+}
+
+/* Nav logo dot — gold pulse */
+.nav-logo-dot {
+  background: radial-gradient(circle, #FFD700 0%, #FFA500 100%);
+  box-shadow: 0 0 8px #FFD70088;
+  animation: goldPulse 2.4s ease-in-out infinite;
+}
+@keyframes goldPulse {
+  0%, 100% { box-shadow: 0 0 6px #FFD70066; }
+  50%       { box-shadow: 0 0 14px #FFD700cc; }
+}
+
+/* Avatar wrapper */
+.avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Profile pic avatar ring — gold */
+.avatar-ring-pic {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+/* Share button — gold */
+.share-btn {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #0a0800;
+  box-shadow: 0 0 12px rgba(255,215,0,0.4);
+  transition: box-shadow 200ms ease, opacity 150ms ease;
+}
+.share-btn:hover {
+  opacity: 1 !important;
+  box-shadow: 0 0 22px rgba(255,215,0,0.65);
+}
+
+/* Auto-save toast */
+.save-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: #0a0800;
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 10px 24px;
+  border-radius: 999px;
+  z-index: 200;
+  box-shadow: 0 4px 24px rgba(255,215,0,0.5);
+  animation: toastIn 300ms ease, toastOut 300ms ease 2.1s both;
+  pointer-events: none;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes toastOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Gold glow on eligible pill */
+.pill-eligible {
+  box-shadow: 0 0 8px rgba(20,241,149,0.4);
+}
+
+/* Gold accent on board filter pills active state */
+.board-pill-active {
+  border-color: #FFD70055 !important;
+  background: rgba(255,215,0,0.08) !important;
+  color: #FFD700 !important;
+}
+
+/* Gold active nav tab */
+.nav-tab-active {
+  color: #FFD700 !important;
+  border-bottom-color: #FFD700 !important;
+}
+
+/* Save download btn — gold */
+.share-dl-btn {
+  background: linear-gradient(135deg, #FFD700, #FFA500) !important;
+  color: #0a0800 !important;
+  box-shadow: 0 0 14px rgba(255,215,0,0.35);
+}
+
+/* Profile pic remove button */
+.profile-pic-remove {
+  position: absolute;
+  top: -4px; right: -4px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #ff4444;
+  color: #fff;
+  border: none;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
