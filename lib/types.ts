@@ -30,6 +30,9 @@ export type AirdropRule = {
   trustedDomains?: string[];
   timeline?: AirdropTimeline;
   riskLevel: "low" | "medium" | "high";
+  estimatedValue?: string;
+  description?: string;
+  tags?: string[];
   checks: {
     minSolBalance?: number;
     minTokenAccounts?: number;
@@ -52,6 +55,9 @@ export type AirdropEvaluation = {
   officialClaimUrl: string;
   sourceUrl: string;
   riskLevel: AirdropRule["riskLevel"];
+  estimatedValue?: string;
+  description?: string;
+  tags?: string[];
   timeline?: AirdropTimeline;
   proof: {
     met: string[];
