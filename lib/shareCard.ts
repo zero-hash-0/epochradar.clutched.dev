@@ -266,5 +266,5 @@ export function drawShareCard(
   ctx.font = "500 11px ui-monospace, 'SF Mono', Menlo, monospace";
   ctx.fillStyle = "rgba(255,255,255,0.18)";
   ctx.textAlign = "center";
-  ctx.fillText("epochradar.clutched.dev  ·  Solana Airdrop Checker", W / 2, H - 14);
+  ctx.fillText("epochradar.com  ·  Solana Airdrop Checker", W / 2, H - 14);
 }
