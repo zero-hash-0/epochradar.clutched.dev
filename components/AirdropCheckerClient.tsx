@@ -525,13 +525,6 @@ export default function AirdropCheckerClient() {
                 {loading ? "Checking Eligibility..." : "Check Eligibility"}
               </button>
             </div>
-            {showAdminTab ? (
-              <div className="admin-tab-wrap">
-                <a href="/admin" className="admin-tab-link">
-                  Admin
-                </a>
-              </div>
-            ) : null}
             {walletAddress ? <p className="wallet">Wallet: {walletAddress}</p> : null}
             {error ? <p className="error">{error}</p> : null}
             <div className="pro-upgrade">
@@ -711,6 +704,13 @@ export default function AirdropCheckerClient() {
 
               <StatusTabs results={data.results} shareBaseUrl={shareBaseUrl} />
             </>
+          ) : null}
+          {showAdminTab ? (
+            <div className="admin-tab-wrap admin-tab-bottom">
+              <a href="/admin" className="admin-tab-link">
+                Admin
+              </a>
+            </div>
           ) : null}
           <footer className="credit">
             <span>Made with Love</span>

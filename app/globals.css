@@ -369,6 +369,10 @@ h2 {
   margin-top: 10px;
 }
 
+.admin-tab-bottom {
+  margin-top: 18px;
+}
+
 .admin-tab-link {
   display: inline-flex;
   align-items: center;
