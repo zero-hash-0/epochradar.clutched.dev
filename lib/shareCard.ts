@@ -13,16 +13,15 @@ export type ShareCardData = {
   profilePic?: string;
 };
 
-const GOLD1  = "#FFD700";
-const GOLD2  = "#FFA500";
-const GOLD3  = "#FFE566";
-const PURPLE = "#9945FF";
-const GREEN  = "#14F195";
-const TEAL   = "#00C2FF";
+const SOL_NEON  = "#23D3FF";
+const SOL_LIME  = "#B8EF6D";
+const SOL_AMBER = "#FFC46D";
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number, r: number,
+  x: number, y: number,
+  w: number, h: number,
+  r: number,
 ) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -37,19 +36,9 @@ function roundRect(
   ctx.closePath();
 }
 
-function seededRand(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) & 0xffffffff;
-    return (s >>> 0) / 0xffffffff;
-  };
-}
-
 export function drawShareCard(
   canvas: HTMLCanvasElement,
   data: ShareCardData,
-  bgImage?: HTMLImageElement,
-  profileImg?: HTMLImageElement,
 ): void {
   const W = 1080;
   const H = 1080;
