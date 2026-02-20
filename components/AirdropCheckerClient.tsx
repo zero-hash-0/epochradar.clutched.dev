@@ -359,7 +359,7 @@ export default function AirdropCheckerClient() {
         finish();
       }
     };
-    sponge.src = "/share-bg.jpg";
+    sponge.src = `/spongebob.jpg?v=${Date.now()}`;
   }, [buildCardData, profilePic]);
 
   /* ── Draw share card whenever modal opens (for preview) ── */
@@ -379,7 +379,7 @@ export default function AirdropCheckerClient() {
       }
     };
     sponge.onerror = () => drawShareCard(shareCanvasRef.current!, cardData);
-    sponge.src = "/share-bg.jpg";
+    sponge.src = `/spongebob.jpg?v=${Date.now()}`;
   }, [showShare, buildCardData, profilePic]);
 
   const downloadShareCard = () => {
@@ -473,16 +473,37 @@ export default function AirdropCheckerClient() {
               <button type="button" className="modal-close" onClick={() => setShowShare(false)}>×</button>
             </div>
 
-            {/* Live canvas preview rendered inside modal */}
+            {/* Canvas lives directly in the modal — draw into it on mount */}
             <div className="share-canvas-wrap">
               <canvas
                 ref={(el) => {
-                  // Sync ref — canvas is hidden elsewhere; this one is the preview
-                  if (el && shareCanvasRef.current && shareCanvasRef.current !== el) {
-                    el.width = shareCanvasRef.current.width;
-                    el.height = shareCanvasRef.current.height;
-                    el.getContext("2d")?.drawImage(shareCanvasRef.current, 0, 0);
-                  }
+                  if (!el) return;
+                  // Point the shared ref at this modal canvas
+                  (shareCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = el;
+                  // Draw immediately
+                  const cardData = buildCardData();
+                  const sponge = new window.Image();
+                  sponge.crossOrigin = "anonymous";
+                  const render = (s?: HTMLImageElement, p?: HTMLImageElement) => {
+                    drawShareCard(el, cardData, s, p);
+                  };
+                  sponge.onload = () => {
+                    if (profilePic) {
+                      const pi = new window.Image();
+                      pi.onload = () => render(sponge, pi);
+                      pi.onerror = () => render(sponge);
+                      pi.src = profilePic;
+                    } else { render(sponge); }
+                  };
+                  sponge.onerror = () => {
+                    if (profilePic) {
+                      const pi = new window.Image();
+                      pi.onload = () => render(undefined, pi);
+                      pi.onerror = () => render();
+                      pi.src = profilePic;
+                    } else { render(); }
+                  };
+                  sponge.src = `/spongebob.jpg?v=${Date.now()}`;
                 }}
                 className="share-canvas"
               />
@@ -564,8 +585,7 @@ export default function AirdropCheckerClient() {
         </div>
       </nav>
 
-      {/* ── Hidden canvas for share card rendering ── */}
-      <canvas ref={shareCanvasRef} style={{ display: "none" }} />
+      {/* share canvas lives inside the modal (ref assigned on mount there) */}
 
       {/* ── Page ── */}
       <main className="page">

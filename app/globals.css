@@ -1431,12 +1431,12 @@ a:hover {
   border-radius: 24px;
   padding: 24px;
   width: 100%;
-  max-width: 580px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   gap: 18px;
   animation: slideUp 200ms ease;
-  box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(20,241,149,0.06);
+  box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,215,0,0.08);
 }
 
 @keyframes slideUp {
@@ -1480,18 +1480,19 @@ a:hover {
 
 /* Canvas preview */
 .share-canvas-wrap {
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,215,0,0.25);
   background: #0d0d0d;
   line-height: 0;
+  box-shadow: 0 0 24px rgba(255,215,0,0.12), 0 8px 32px rgba(0,0,0,0.5);
 }
 
 .share-canvas {
   width: 100%;
   height: auto;
   display: block;
-  border-radius: 14px;
+  border-radius: 15px;
 }
 
 /* Action buttons row */
@@ -1749,14 +1750,18 @@ a:hover {
     scrollbar-width: none;
     height: 40px;
     gap: 0;
+    justify-content: center;
   }
   .nav-tabs::-webkit-scrollbar { display: none; }
 
   .nav-tab {
     font-size: 12px;
-    padding: 0 12px;
+    padding: 0 14px;
     white-space: nowrap;
     flex-shrink: 0;
+    flex: 1;
+    justify-content: center;
+    max-width: 130px;
   }
 
   .nav-right {
