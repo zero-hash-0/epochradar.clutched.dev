@@ -1,7 +1,6 @@
 /**
- * EpochRadar Share Card — Gold Edition
- * SpongeBob art composited right side, gold glow headline,
- * shimmer lines, confetti, full Solana branding.
+ * Draws a shareable airdrop results card onto a canvas.
+ * Tactical dark style with neon-cyan + amber accents.
  */
 
 export type ShareCardData = {
@@ -11,19 +10,17 @@ export type ShareCardData = {
   totalValue: number;
   topAirdrops: Array<{ project: string; status: string; estimatedValue?: string }>;
   solPrice?: number;
-  profilePic?: string; // dataURL
 };
 
-const GOLD1  = "#FFD700";
-const GOLD2  = "#FFA500";
-const GOLD3  = "#FFE566";
-const PURPLE = "#9945FF";
-const GREEN  = "#14F195";
-const TEAL   = "#00C2FF";
+const SOL_NEON  = "#23D3FF";
+const SOL_LIME  = "#B8EF6D";
+const SOL_AMBER = "#FFC46D";
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number, r: number,
+  x: number, y: number,
+  w: number, h: number,
+  r: number,
 ) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -38,394 +35,232 @@ function roundRect(
   ctx.closePath();
 }
 
-function seededRand(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) & 0xffffffff;
-    return (s >>> 0) / 0xffffffff;
-  };
-}
-
 export function drawShareCard(
   canvas: HTMLCanvasElement,
   data: ShareCardData,
-  bgImage?: HTMLImageElement,
-  profileImg?: HTMLImageElement,
 ): void {
-  const W = 960;
-  const H = 500;
-  canvas.width  = W;
+  const W = 800;
+  const H = 440;
+  canvas.width = W;
   canvas.height = H;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const rand = seededRand(77);
-
-  /* ══ 1. Deep dark bg ══ */
-  ctx.fillStyle = "#08070f";
+  /* ── Background ── */
+  ctx.fillStyle = "#0b0f16";
   ctx.fillRect(0, 0, W, H);
 
-  /* ══ 2. Ambient glows ══ */
-  // Gold top-left
-  const gGold = ctx.createRadialGradient(0, 0, 0, 0, 0, 560);
-  gGold.addColorStop(0, "rgba(255,180,0,0.28)");
-  gGold.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = gGold;
+  /* ── Ambient glows ── */
+  const g1 = ctx.createRadialGradient(-40, -40, 0, -40, -40, 420);
+  g1.addColorStop(0, "rgba(255,113,64,0.22)");
+  g1.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g1;
   ctx.fillRect(0, 0, W, H);
 
-  // Purple mid
-  const gPurple = ctx.createRadialGradient(W * 0.45, H * 0.5, 0, W * 0.45, H * 0.5, 380);
-  gPurple.addColorStop(0, "rgba(153,69,255,0.2)");
-  gPurple.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = gPurple;
+  const g2 = ctx.createRadialGradient(W + 40, H + 40, 0, W + 40, H + 40, 380);
+  g2.addColorStop(0, "rgba(184,239,109,0.18)");
+  g2.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g2;
   ctx.fillRect(0, 0, W, H);
 
-  // Green bottom-right
-  const gGreen = ctx.createRadialGradient(W, H, 0, W, H, 420);
-  gGreen.addColorStop(0, "rgba(20,241,149,0.22)");
-  gGreen.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = gGreen;
+  const g3 = ctx.createRadialGradient(W * 0.55, H * 0.2, 0, W * 0.55, H * 0.2, 250);
+  g3.addColorStop(0, "rgba(35,211,255,0.12)");
+  g3.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g3;
   ctx.fillRect(0, 0, W, H);
 
-  /* ══ 3. Gold shimmer diagonal lines ══ */
+  /* ── Gradient border ── */
   ctx.save();
-  for (let i = 0; i < 14; i++) {
-    const x = -200 + i * 90;
-    ctx.strokeStyle = `rgba(255,215,0,${0.02 + rand() * 0.04})`;
-    ctx.lineWidth = 1 + rand() * 1.5;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x + H, H);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  /* ══ 4. Floating money symbols ══ */
-  const symbols = ["$", "◎", "💰", "$", "🪂", "◎", "$", "✦"];
-  for (let i = 0; i < 42; i++) {
-    const sx = rand() * W;
-    const sy = rand() * H;
-    const size = 8 + rand() * 24;
-    const alpha = 0.03 + rand() * 0.1;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.font = `${size}px -apple-system, sans-serif`;
-    ctx.fillStyle = [GOLD1, GOLD2, GREEN, PURPLE, "#fff"][Math.floor(rand() * 5)];
-    ctx.textAlign = "center";
-    ctx.fillText(symbols[Math.floor(rand() * symbols.length)], sx, sy);
-    ctx.restore();
-  }
-
-  /* ══ 5. SpongeBob image — right side fade ══ */
-  if (bgImage) {
-    const aspect = bgImage.naturalHeight / bgImage.naturalWidth;
-    const imgW = 380;
-    const imgH = aspect * imgW;
-    const imgX = W - imgW + 20;
-    const imgY = H - imgH + 30;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(W * 0.44, 0, W * 0.56, H);
-    ctx.clip();
-
-    // draw image
-    ctx.globalAlpha = 0.9;
-    ctx.drawImage(bgImage, imgX, imgY, imgW, imgH);
-
-    // fade left edge
-    ctx.globalCompositeOperation = "destination-out";
-    const fade = ctx.createLinearGradient(W * 0.44, 0, W * 0.58, 0);
-    fade.addColorStop(0, "rgba(0,0,0,1)");
-    fade.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = fade;
-    ctx.fillRect(W * 0.44, 0, W * 0.15, H);
-
-    // gold glow overlay on SpongeBob
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 0.18;
-    const spongGlow = ctx.createRadialGradient(W * 0.72, H * 0.6, 0, W * 0.72, H * 0.6, 200);
-    spongGlow.addColorStop(0, GOLD1);
-    spongGlow.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = spongGlow;
-    ctx.fillRect(W * 0.44, 0, W * 0.56, H);
-
-    ctx.restore();
-  }
-
-  /* ══ 6. Left frosted glass panel ══ */
-  ctx.save();
-  roundRect(ctx, 22, 18, W * 0.50, H - 36, 20);
-  ctx.fillStyle = "rgba(8,7,15,0.80)";
-  ctx.fill();
-  // gold inner border
-  const panelBorder = ctx.createLinearGradient(22, 18, 22, H - 18);
-  panelBorder.addColorStop(0, "rgba(255,215,0,0.35)");
-  panelBorder.addColorStop(0.5, "rgba(153,69,255,0.15)");
-  panelBorder.addColorStop(1, "rgba(20,241,149,0.25)");
-  ctx.strokeStyle = panelBorder;
+  const borderGrad = ctx.createLinearGradient(0, 0, W, H);
+  borderGrad.addColorStop(0, "rgba(255,196,109,0.44)");
+  borderGrad.addColorStop(0.5, "rgba(35,211,255,0.28)");
+  borderGrad.addColorStop(1, "rgba(184,239,109,0.4)");
+  ctx.strokeStyle = borderGrad;
   ctx.lineWidth = 1.5;
+  roundRect(ctx, 1, 1, W - 2, H - 2, 20);
   ctx.stroke();
   ctx.restore();
 
-  /* ══ 7. Logo row ══ */
-  // Animated-style double ring logo
-  const lx = 50, ly = 52;
-  // Outer glow
-  const logoGlow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 22);
-  logoGlow.addColorStop(0, "rgba(255,215,0,0.4)");
-  logoGlow.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = logoGlow;
-  ctx.beginPath();
-  ctx.arc(lx, ly, 22, 0, Math.PI * 2);
+  /* ── Top bar ── */
+  ctx.fillStyle = "rgba(255,255,255,0.03)";
+  roundRect(ctx, 20, 18, W - 40, 54, 12);
   ctx.fill();
-  // Purple fill
-  ctx.fillStyle = PURPLE;
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  /* Solana logo mark — two colored circles */
+  const dotX = 46, dotY = 45;
+  // Amber circle
+  ctx.fillStyle = SOL_AMBER;
   ctx.beginPath();
-  ctx.arc(lx, ly, 8, 0, Math.PI * 2);
+  ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
   ctx.fill();
-  // Gold ring
-  ctx.strokeStyle = GOLD1;
+  // Neon ring
+  ctx.strokeStyle = SOL_NEON;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(lx, ly, 12, 0, Math.PI * 2);
-  ctx.stroke();
-  // Green outer ring
-  ctx.strokeStyle = GREEN;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(lx, ly, 16, 0, Math.PI * 2);
+  ctx.arc(dotX, dotY, 10, 0, Math.PI * 2);
   ctx.stroke();
 
-  // "EpochRadar" text
-  ctx.font = "700 18px ui-monospace, 'SF Mono', monospace";
-  ctx.fillStyle = "#fff";
+  // "EpochRadar"
+  ctx.font = "700 17px ui-monospace, 'SF Mono', Menlo, monospace";
+  ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
-  ctx.fillText("EpochRadar", 72, 48);
+  ctx.fillText("EpochRadar", 66, 50);
 
-  // "by Solana" sub-badge
-  ctx.font = "500 10px -apple-system, sans-serif";
-  ctx.fillStyle = GOLD2;
-  ctx.fillText("✦ Solana Network", 73, 63);
-
-  // Wallet chip (top right of panel)
-  const wallet = data.walletAddress
-    ? `${data.walletAddress.slice(0, 6)}…${data.walletAddress.slice(-4)}`
-    : "Demo Wallet";
-  ctx.font = "500 11px ui-monospace, monospace";
-  const chipW = ctx.measureText(wallet).width + 24;
-  const chipX = W * 0.50 - chipW - 10;
-  roundRect(ctx, chipX, 36, chipW, 26, 7);
-  ctx.fillStyle = "rgba(255,215,0,0.10)";
+  // Powered by Solana badge
+  const badgeText = "Powered by Solana";
+  ctx.font = "500 11px -apple-system, sans-serif";
+  const bw = ctx.measureText(badgeText).width + 20;
+  roundRect(ctx, 82, 54, bw, 16, 4);
+  ctx.fillStyle = `${SOL_AMBER}2A`;
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,215,0,0.28)";
+  ctx.fillStyle = SOL_AMBER;
+  ctx.textAlign = "left";
+  ctx.fillText(badgeText, 92, 66);
+
+  // Wallet address
+  const walletLabel = data.walletAddress
+    ? `${data.walletAddress.slice(0, 6)}...${data.walletAddress.slice(-4)}`
+    : "Demo wallet";
+  ctx.font = "500 12px ui-monospace, 'SF Mono', Menlo, monospace";
+  const ww = ctx.measureText(walletLabel).width + 24;
+  roundRect(ctx, W - 20 - ww - 4, 28, ww, 30, 8);
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
   ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.fillStyle = GOLD3;
+  ctx.fillStyle = "#666";
+  ctx.textAlign = "center";
+  ctx.fillText(walletLabel, W - 20 - ww / 2 - 4, 48);
+
+  /* ── Main headline ── */
   ctx.textAlign = "left";
-  ctx.fillText(wallet, chipX + 12, 54);
-
-  /* ══ 8. Profile pic (if provided) ══ */
-  if (profileImg) {
-    const pr = 22;
-    const px2 = chipX - pr * 2 - 8;
-    const py2 = 36 + 13;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(px2, py2, pr, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.drawImage(profileImg, px2 - pr, py2 - pr, pr * 2, pr * 2);
-    ctx.restore();
-    // gold ring around profile pic
-    ctx.strokeStyle = GOLD1;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(px2, py2, pr + 1, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  /* ══ 9. EYEBROW ══ */
-  ctx.font = "700 10px -apple-system, sans-serif";
-  ctx.fillStyle = "rgba(255,215,0,0.5)";
-  ctx.textAlign = "left";
-  ctx.fillText("✦  SOLANA AIRDROP RESULTS  ✦", 38, 108);
-
-  /* ══ 10. BIG gold gradient value ══ */
-  const totalStr = `$${data.totalValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  ctx.font = "800 68px -apple-system, BlinkMacSystemFont, sans-serif";
-  const tw = ctx.measureText(totalStr).width;
-
-  // Gold glow behind text
-  const textGlow = ctx.createRadialGradient(38 + tw / 2, 165, 0, 38 + tw / 2, 165, tw * 0.7);
-  textGlow.addColorStop(0, "rgba(255,200,0,0.22)");
-  textGlow.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = textGlow;
-  ctx.fillRect(30, 115, tw + 30, 80);
-
-  // Gradient text
-  const textGrad = ctx.createLinearGradient(38, 118, 38 + tw, 182);
-  textGrad.addColorStop(0,    GOLD3);
-  textGrad.addColorStop(0.3,  GOLD1);
-  textGrad.addColorStop(0.6,  GOLD2);
-  textGrad.addColorStop(0.85, GREEN);
-  textGrad.addColorStop(1,    TEAL);
-  ctx.fillStyle = textGrad;
-  ctx.textAlign = "left";
-  ctx.fillText(totalStr, 38, 182);
-
-  // Subtitle
   ctx.font = "400 13px -apple-system, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.4)";
-  ctx.fillText("worth of Solana airdrops found 🪂", 40, 204);
+  ctx.fillText("Total airdrop value found", 34, 108);
 
-  /* ══ 11. Stats pills ══ */
+  ctx.font = "700 54px -apple-system, sans-serif";
+  const totalStr = `$${data.totalValue.toFixed(2)}`;
+  const headGrad = ctx.createLinearGradient(34, 118, 34 + ctx.measureText(totalStr).width, 174);
+  headGrad.addColorStop(0, SOL_AMBER);
+  headGrad.addColorStop(0.5, SOL_NEON);
+  headGrad.addColorStop(1, SOL_LIME);
+  ctx.fillStyle = headGrad;
+  ctx.fillText(totalStr, 34, 172);
+
+  /* ── Stats pills ── */
   const stats = [
-    { label: "Eligible",  val: data.eligibleCount,                         color: GOLD1,   bg: "rgba(255,215,0,0.12)",   border: "rgba(255,215,0,0.35)"   },
-    { label: "Likely",    val: data.likelyCount,                            color: GREEN,   bg: "rgba(20,241,149,0.10)",  border: "rgba(20,241,149,0.30)"  },
-    { label: "Total",     val: data.eligibleCount + data.likelyCount,       color: PURPLE,  bg: "rgba(153,69,255,0.10)",  border: "rgba(153,69,255,0.30)"  },
+    { label: "Eligible",  value: String(data.eligibleCount),                         color: SOL_LIME,  bg: "rgba(184,239,109,0.10)",  border: "rgba(184,239,109,0.3)"  },
+    { label: "Likely",    value: String(data.likelyCount),                            color: SOL_NEON,  bg: "rgba(35,211,255,0.10)",   border: "rgba(35,211,255,0.3)"   },
+    { label: "Airdrops",  value: String(data.eligibleCount + data.likelyCount),       color: SOL_AMBER, bg: "rgba(255,196,109,0.10)",  border: "rgba(255,196,109,0.32)"  },
   ];
 
-  let sx = 38;
-  for (const s of stats) {
-    const bw = 92, bh = 58, by = 220;
-    roundRect(ctx, sx, by, bw, bh, 11);
-    ctx.fillStyle = s.bg;
+  let px = 34;
+  for (const stat of stats) {
+    ctx.font = "600 11px -apple-system, sans-serif";
+    const lw = ctx.measureText(stat.label).width;
+    ctx.font = "700 16px -apple-system, sans-serif";
+    const vw = ctx.measureText(stat.value).width;
+    const pillW = Math.max(lw, vw) + 36;
+    const pillH = 52;
+    const py = 194;
+
+    roundRect(ctx, px, py, pillW, pillH, 10);
+    ctx.fillStyle = stat.bg;
     ctx.fill();
-    ctx.strokeStyle = s.border;
+    ctx.strokeStyle = stat.border;
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // label
-    ctx.font = "500 10px -apple-system, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.38)";
+    ctx.font = "500 10.5px -apple-system, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
     ctx.textAlign = "center";
-    ctx.fillText(s.label, sx + bw / 2, by + 17);
+    ctx.fillText(stat.label, px + pillW / 2, py + 17);
 
-    // value with glow
-    ctx.save();
-    ctx.shadowColor = s.color;
-    ctx.shadowBlur = 8;
-    ctx.font = "700 24px -apple-system, sans-serif";
-    ctx.fillStyle = s.color;
-    ctx.fillText(String(s.val), sx + bw / 2, by + 44);
-    ctx.restore();
+    ctx.font = "700 18px -apple-system, sans-serif";
+    ctx.fillStyle = stat.color;
+    ctx.fillText(stat.value, px + pillW / 2, py + 40);
 
-    sx += bw + 8;
+    px += pillW + 10;
   }
 
-  /* ══ 12. Gold divider with stars ══ */
-  const divGrad = ctx.createLinearGradient(38, 0, W * 0.49, 0);
-  divGrad.addColorStop(0,   "rgba(255,215,0,0.6)");
-  divGrad.addColorStop(0.5, "rgba(153,69,255,0.3)");
-  divGrad.addColorStop(1,   "rgba(20,241,149,0.5)");
+  /* ── Divider ── */
+  const divGrad = ctx.createLinearGradient(34, 0, W - 34, 0);
+  divGrad.addColorStop(0, "rgba(255,196,109,0.3)");
+  divGrad.addColorStop(0.5, "rgba(35,211,255,0.2)");
+  divGrad.addColorStop(1, "rgba(184,239,109,0.3)");
   ctx.strokeStyle = divGrad;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(38, 296);
-  ctx.lineTo(W * 0.49 - 10, 296);
+  ctx.moveTo(34, 266);
+  ctx.lineTo(W - 34, 266);
   ctx.stroke();
 
-  /* ══ 13. Top airdrops ══ */
-  ctx.font = "600 10px -apple-system, sans-serif";
-  ctx.fillStyle = "rgba(255,215,0,0.5)";
+  /* ── Top airdrops ── */
+  ctx.font = "600 11px -apple-system, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.3)";
   ctx.textAlign = "left";
-  ctx.fillText("✦  TOP AIRDROPS", 38, 316);
+  ctx.fillText("TOP AIRDROPS", 34, 290);
 
-  const top = data.topAirdrops.slice(0, 4);
-  const cardW = Math.floor((W * 0.48 - 38) / Math.max(top.length, 1)) - 8;
+  const topItems = data.topAirdrops.slice(0, 4);
+  const colW = (W - 68) / Math.max(topItems.length, 1);
 
-  top.forEach((item, i) => {
-    const cx2 = 38 + i * (cardW + 8);
-    const cy2 = 326;
-    const ch = 108;
-    const col = item.status === "Eligible" ? GOLD1 : item.status === "Likely" ? GREEN : TEAL;
+  topItems.forEach((item, i) => {
+    const ix = 34 + i * colW;
+    const iy = 304;
+    const iw = colW - 10;
+    const ih = 94;
 
-    roundRect(ctx, cx2, cy2, cardW, ch, 10);
-    ctx.fillStyle = col === GOLD1 ? "rgba(255,215,0,0.08)" : col === GREEN ? "rgba(20,241,149,0.08)" : "rgba(0,194,255,0.08)";
+    roundRect(ctx, ix, iy, iw, ih, 10);
+    ctx.fillStyle = "rgba(255,255,255,0.03)";
     ctx.fill();
-    ctx.strokeStyle = col + "44";
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Logo circle with glow
-    ctx.save();
-    ctx.shadowColor = col;
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = col + "25";
+    // Logo circle with Solana gradient
+    const logoGrad = ctx.createLinearGradient(ix + 8, iy + 8, ix + 36, iy + 36);
+    logoGrad.addColorStop(0, SOL_AMBER);
+    logoGrad.addColorStop(1, SOL_NEON);
+    ctx.fillStyle = `rgba(255,196,109,0.14)`;
     ctx.beginPath();
-    ctx.arc(cx2 + 18, cy2 + 22, 13, 0, Math.PI * 2);
+    ctx.arc(ix + 22, iy + 24, 14, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
-    ctx.strokeStyle = col + "88";
+    ctx.strokeStyle = logoGrad;
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cx2 + 18, cy2 + 22, 13, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.font = "700 9px -apple-system, sans-serif";
-    ctx.fillStyle = col;
+    ctx.font = "700 10px -apple-system, sans-serif";
+    ctx.fillStyle = SOL_LIME;
     ctx.textAlign = "center";
-    ctx.fillText(item.project.slice(0, 2).toUpperCase(), cx2 + 18, cy2 + 26);
+    ctx.fillText(item.project.slice(0, 2).toUpperCase(), ix + 22, iy + 28);
 
-    ctx.font = "600 10px -apple-system, sans-serif";
+    // Project name
+    ctx.font = "600 12px -apple-system, sans-serif";
     ctx.fillStyle = "#fff";
     ctx.textAlign = "left";
-    const nm = item.project.length > 10 ? item.project.slice(0, 9) + "…" : item.project;
-    ctx.fillText(nm, cx2 + 6, cy2 + 50);
+    const name = item.project.length > 13 ? item.project.slice(0, 12) + "…" : item.project;
+    ctx.fillText(name, ix + 40, iy + 20);
 
+    // Est value
+    const valColor = item.status === "Eligible" ? SOL_LIME : item.status === "Likely" ? SOL_NEON : SOL_AMBER;
+    ctx.font = "500 11px -apple-system, sans-serif";
+    ctx.fillStyle = valColor;
+    ctx.fillText(item.estimatedValue ?? "TBD", ix + 40, iy + 36);
+
+    // Status badge
     ctx.font = "600 10px -apple-system, sans-serif";
-    ctx.fillStyle = col;
-    ctx.fillText(item.estimatedValue ?? "TBD", cx2 + 6, cy2 + 65);
-
-    ctx.font = "500 8.5px -apple-system, sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.3)";
-    ctx.fillText(item.status.toUpperCase(), cx2 + 6, cy2 + 80);
-
-    // Bottom glow bar
-    const barGrad = ctx.createLinearGradient(cx2, cy2 + ch - 4, cx2 + cardW, cy2 + ch - 4);
-    barGrad.addColorStop(0, col + "00");
-    barGrad.addColorStop(0.5, col + "88");
-    barGrad.addColorStop(1, col + "00");
-    ctx.fillStyle = barGrad;
-    ctx.fillRect(cx2, cy2 + ch - 4, cardW, 3);
+    ctx.fillText(item.status, ix + 12, iy + 76);
   });
 
-  /* ══ 14. Confetti dots ══ */
-  const confetti = [GOLD1, GOLD2, GREEN, PURPLE, TEAL, "#FF6B6B", "#fff"];
-  for (let i = 0; i < 35; i++) {
-    const cx3 = rand() * W;
-    const cy3 = rand() * H;
-    const r   = 1 + rand() * 3.5;
-    ctx.save();
-    ctx.globalAlpha = 0.12 + rand() * 0.4;
-    ctx.shadowColor = confetti[Math.floor(rand() * confetti.length)];
-    ctx.shadowBlur  = 4;
-    ctx.fillStyle   = confetti[Math.floor(rand() * confetti.length)];
-    ctx.beginPath();
-    ctx.arc(cx3, cy3, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  /* ══ 15. Outer gradient border with gold glow ══ */
-  ctx.save();
-  ctx.shadowColor = GOLD1;
-  ctx.shadowBlur  = 16;
-  const outerBorder = ctx.createLinearGradient(0, 0, W, H);
-  outerBorder.addColorStop(0,    GOLD1 + "cc");
-  outerBorder.addColorStop(0.35, PURPLE + "88");
-  outerBorder.addColorStop(0.7,  TEAL + "66");
-  outerBorder.addColorStop(1,    GREEN + "cc");
-  ctx.strokeStyle = outerBorder;
-  ctx.lineWidth = 2;
-  roundRect(ctx, 1, 1, W - 2, H - 2, 22);
-  ctx.stroke();
-  ctx.restore();
-
-  /* ══ 16. Watermark ══ */
-  ctx.font = "500 11px ui-monospace, monospace";
-  ctx.fillStyle = "rgba(255,215,0,0.25)";
+  /* ── Bottom watermark ── */
+  ctx.font = "500 11px ui-monospace, 'SF Mono', Menlo, monospace";
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
   ctx.textAlign = "center";
-  ctx.fillText("epochradar.com  ✦  Solana Airdrop Checker", W / 2, H - 12);
+  ctx.fillText("epochradar.com  ·  Solana Airdrop Checker", W / 2, H - 14);
 }

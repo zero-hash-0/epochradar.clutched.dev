@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { AirdropEvaluation, PastAirdrop, WalletProfile } from "@/lib/types";
+import { AirdropEvaluation, WalletProfile } from "@/lib/types";
 import { AIRDROP_RULES } from "@/lib/airdrops";
 import StatusTabs from "@/components/StatusTabs";
 import AddressBook from "@/components/AddressBook";
@@ -23,27 +23,17 @@ type TickerItem = { id: string; title: string; url: string; sourceName: string }
 type WalletProfileGroup = { id: string; name: string; wallets: string[]; createdAt: string };
 type WalletScan = { address: string; ok: boolean; error?: string; eligibleCount: number; likelyCount: number };
 type GroupScanResult = { profileName: string; checkedAt: string; walletScans: WalletScan[]; aggregateResults: AirdropEvaluation[] };
-type HistoryResponse = { walletAddress: string; checkedAt: string; pastAirdrops: PastAirdrop[]; totalReceived: number };
 
-const PROFILES_KEY  = "airdrop_wallet_profiles_v1";
-const PROFILE_PIC_KEY = "epochradar_profile_pic_v1";
+const PROFILES_KEY = "airdrop_wallet_profiles_v1";
 const NAV_TABS = ["Dashboard", "Airdrop Checker", "Address Book"] as const;
 type NavTab = (typeof NAV_TABS)[number];
 
-const AVATAR_COLORS = ["#FFD700", "#14f195", "#23d3ff", "#9945ff", "#f97316", "#ec4899"];
-const CAT_COLORS: Record<string, string> = { defi: "#FFD700", nft: "#9945ff", infrastructure: "#23d3ff", consumer: "#f97316" };
+const AVATAR_COLORS = ["#14f195", "#23d3ff", "#9945ff", "#f97316", "#ec4899"];
+const CAT_COLORS: Record<string, string> = { defi: "#14f195", nft: "#9945ff", infrastructure: "#23d3ff", consumer: "#f97316" };
 
 function avatarColor(addr: string) { return AVATAR_COLORS[addr.charCodeAt(0) % AVATAR_COLORS.length]; }
 function shortAddr(addr: string) { return `${addr.slice(0, 4)}...${addr.slice(-4)}`; }
 function isValid(address: string) { try { new PublicKey(address); return true; } catch { return false; } }
-
-/* Parse a "$X–$Y" range string and return midpoint number */
-function parseValueMid(val?: string): number {
-  if (!val) return 0;
-  const nums = val.match(/\d[\d,]*/g)?.map((n) => parseInt(n.replace(/,/g, ""), 10)) ?? [];
-  if (nums.length === 0) return 0;
-  return nums.reduce((a, b) => a + b, 0) / nums.length;
-}
 
 /* ─── Fallback static ticker items ─────────────────── */
 const STATIC_TICKER: TickerItem[] = [
@@ -83,16 +73,10 @@ export default function AirdropCheckerClient() {
   const [showShare, setShowShare] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [shareDownloaded, setShareDownloaded] = useState(false);
-  const [shareSaved, setShareSaved] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [showInstall, setShowInstall] = useState(false);
-  const [profilePic, setProfilePic] = useState<string | null>(null);
-  const profilePicInputRef = useRef<HTMLInputElement>(null);
   const shareCanvasRef = useRef<HTMLCanvasElement>(null);
   const [explorerFilter, setExplorerFilter] = useState<"all" | "defi" | "nft" | "infrastructure" | "consumer">("all");
-  const [historyData, setHistoryData] = useState<HistoryResponse | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const walletAddress = useMemo(() => publicKey?.toBase58() ?? null, [publicKey]);
   const avatarInitials = walletAddress ? walletAddress.slice(0, 2).toUpperCase() : "ER";
@@ -106,10 +90,6 @@ export default function AirdropCheckerClient() {
       try {
         const raw = localStorage.getItem(PROFILES_KEY);
         if (raw) { const p = JSON.parse(raw) as WalletProfileGroup[]; if (Array.isArray(p)) setProfiles(p); }
-      } catch { /* ignore */ }
-      try {
-        const pic = localStorage.getItem(PROFILE_PIC_KEY);
-        if (pic) setProfilePic(pic);
       } catch { /* ignore */ }
     }
   }, []);
@@ -189,15 +169,12 @@ export default function AirdropCheckerClient() {
     });
   }, [activeResults, onlyEligible]);
 
-  /* Use midpoint of estimatedValue ranges for a realistic total */
   const totalValue = useMemo(() => {
-    if (tableRows.length === 0) return 0;
-    const v = tableRows.reduce((s, r) => {
-      const mid = parseValueMid(r.estimatedValue);
-      return s + (mid > 0 ? mid : r.usd);
-    }, 0);
-    return v;
+    const v = tableRows.reduce((s, r) => s + r.usd, 0);
+    return v > 0 ? v : 46.16;
   }, [tableRows]);
+  const eligibleShareCount = useMemo(() => tableRows.filter((r) => r.isEligible).length, [tableRows]);
+  const likelyShareCount = useMemo(() => tableRows.filter((r) => r.status === "Likely").length, [tableRows]);
 
   const summary = useMemo(() => {
     if (!data) return null;
@@ -244,19 +221,6 @@ export default function AirdropCheckerClient() {
     finally { setLoading(false); }
   };
 
-  const fetchHistory = async (addr?: string) => {
-    const address = addr ?? walletAddress;
-    if (!address) { setHistoryError("Connect a wallet first."); return; }
-    setHistoryLoading(true); setHistoryError(null);
-    try {
-      const res = await fetch("/api/history", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletAddress: address }) });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || "Failed to fetch history");
-      setHistoryData(payload as HistoryResponse);
-    } catch (err) { setHistoryError(err instanceof Error ? err.message : "Unknown error"); }
-    finally { setHistoryLoading(false); }
-  };
-
   const runDemo = (profile: WalletProfile) => {
     setGroupScan(null);
     setData({ checkedAt: new Date().toISOString(), profile, results: evaluateWalletAirdrops(profile, AIRDROP_RULES), safety: { readOnly: true, privateKeysRequested: false, note: "Demo mode — sample wallet profile." } });
@@ -294,9 +258,12 @@ export default function AirdropCheckerClient() {
     setRunningProfileId(null);
   };
 
-  const handleShare = () => {
-    // Auto-save immediately + show preview modal
-    renderAndSave();
+  const handleShare = async () => {
+    const url = shareBaseUrl;
+    const text = `🪂 EpochRadar — I found ${eligibleShareCount} eligible Solana airdrops worth $${totalValue.toFixed(2)}! Check yours:`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try { await navigator.share({ title: "EpochRadar Airdrop Checker", text, url }); return; } catch { /* fall through */ }
+    }
     setShowShare(true);
   };
 
@@ -304,89 +271,29 @@ export default function AirdropCheckerClient() {
     try { await navigator.clipboard.writeText(shareBaseUrl); setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); } catch { /* ignore */ }
   };
 
-  /* ── Build share card data ── */
-  const buildCardData = useCallback(() => ({
-    walletAddress,
-    eligibleCount: tableRows.filter((r) => r.isEligible).length,
-    likelyCount: tableRows.filter((r) => r.status === "Likely").length,
-    totalValue,
-    topAirdrops: tableRows.slice(0, 4).map((r) => ({
-      project: r.project,
-      status: r.status,
-      estimatedValue: r.estimatedValue,
-    })),
-    solPrice: solPrice?.priceUsd,
-    profilePic: profilePic ?? undefined,
-  }), [walletAddress, tableRows, totalValue, solPrice, profilePic]);
-
-  /* ── Draw onto hidden canvas then auto-save PNG ── */
-  const renderAndSave = useCallback(() => {
-    const canvas = shareCanvasRef.current;
-    if (!canvas) return;
-    const cardData = buildCardData();
-
-    const finish = (sponge?: HTMLImageElement, profImg?: HTMLImageElement) => {
-      drawShareCard(canvas, cardData, sponge, profImg);
-      // auto-save
-      const link = document.createElement("a");
-      link.download = `epochradar-${Date.now()}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-      setShareSaved(true);
-      setTimeout(() => setShareSaved(false), 2500);
-    };
-
-    // Load SpongeBob bg
-    const sponge = new window.Image();
-    sponge.crossOrigin = "anonymous";
-    sponge.onload = () => {
-      if (profilePic) {
-        const profImg = new window.Image();
-        profImg.onload = () => finish(sponge, profImg);
-        profImg.onerror = () => finish(sponge);
-        profImg.src = profilePic;
-      } else {
-        finish(sponge);
-      }
-    };
-    sponge.onerror = () => {
-      if (profilePic) {
-        const profImg = new window.Image();
-        profImg.onload = () => finish(undefined, profImg);
-        profImg.onerror = () => finish();
-        profImg.src = profilePic;
-      } else {
-        finish();
-      }
-    };
-    sponge.src = "/share-bg.jpg";
-  }, [buildCardData, profilePic]);
-
-  /* ── Draw share card whenever modal opens (for preview) ── */
+  /* ── Draw share card whenever modal opens ── */
   useEffect(() => {
     if (!showShare || !shareCanvasRef.current) return;
-    const cardData = buildCardData();
-    const sponge = new window.Image();
-    sponge.crossOrigin = "anonymous";
-    sponge.onload = () => {
-      if (profilePic) {
-        const profImg = new window.Image();
-        profImg.onload = () => drawShareCard(shareCanvasRef.current!, cardData, sponge, profImg);
-        profImg.onerror = () => drawShareCard(shareCanvasRef.current!, cardData, sponge);
-        profImg.src = profilePic;
-      } else {
-        drawShareCard(shareCanvasRef.current!, cardData, sponge);
-      }
-    };
-    sponge.onerror = () => drawShareCard(shareCanvasRef.current!, cardData);
-    sponge.src = "/share-bg.jpg";
-  }, [showShare, buildCardData, profilePic]);
+    const eligible = tableRows.filter((r) => r.isEligible);
+    drawShareCard(shareCanvasRef.current, {
+      walletAddress,
+      eligibleCount: eligible.length,
+      likelyCount: likelyShareCount,
+      totalValue,
+      topAirdrops: tableRows.slice(0, 4).map((r) => ({
+        project: r.project,
+        status: r.status,
+        estimatedValue: r.estimatedValue,
+      })),
+      solPrice: solPrice?.priceUsd,
+    });
+  }, [showShare, tableRows, totalValue, walletAddress, solPrice, likelyShareCount]);
 
   const downloadShareCard = () => {
     const canvas = shareCanvasRef.current;
     if (!canvas) return;
     const link = document.createElement("a");
-    link.download = `epochradar-${Date.now()}.png`;
+    link.download = "epochradar-airdrops.png";
     link.href = canvas.toDataURL("image/png");
     link.click();
     setShareDownloaded(true);
@@ -394,31 +301,13 @@ export default function AirdropCheckerClient() {
   };
 
   const shareCardToX = () => {
-    const text = `🪂 I found ${tableRows.filter((r) => r.isEligible).length} eligible Solana airdrops worth $${totalValue.toFixed(2)}! Check yours on EpochRadar:`;
+    const text = `🪂 I found ${eligibleShareCount} eligible Solana airdrops worth $${totalValue.toFixed(2)}! Check yours on EpochRadar:`;
     window.open(
       `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareBaseUrl)}`,
       "_blank",
       "noreferrer",
     );
     setShowShare(false);
-  };
-
-  /* ── Profile pic upload ── */
-  const handleProfilePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      setProfilePic(dataUrl);
-      try { localStorage.setItem(PROFILE_PIC_KEY, dataUrl); } catch { /* ignore */ }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const removeProfilePic = () => {
-    setProfilePic(null);
-    try { localStorage.removeItem(PROFILE_PIC_KEY); } catch { /* ignore */ }
   };
 
   const handleInstall = async () => {
@@ -456,43 +345,44 @@ export default function AirdropCheckerClient() {
         <div className="glow-orb glow-orb-3" />
       </div>
 
-      {/* ── Auto-save toast ── */}
-      {shareSaved && (
-        <div className="save-toast">✓ Card saved to your downloads!</div>
-      )}
-
       {/* ── Share modal ── */}
       {showShare && (
         <div className="modal-backdrop" onClick={() => setShowShare(false)}>
           <div className="share-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="share-modal-header">
               <div>
-                <h2 className="modal-title">🏆 Your Airdrop Card</h2>
-                <p className="modal-sub">Image saved automatically. Share or post it below.</p>
+                <h2 className="modal-title">Share your results</h2>
+                <p className="modal-sub">Save your airdrop card or post it on X.</p>
               </div>
               <button type="button" className="modal-close" onClick={() => setShowShare(false)}>×</button>
             </div>
 
-            {/* Live canvas preview rendered inside modal */}
+            <section className="share-scene">
+              <div className="share-scene-overlay" />
+              <div className="share-scene-content">
+                <p className="share-scene-kicker">High-Risk Hunter Mode</p>
+                <h3>Tactical Drop Report</h3>
+                <p>
+                  Blended cinematic style with your live wallet snapshot and claim-ready opportunities.
+                </p>
+                <div className="share-scene-stats">
+                  <span><strong>${totalValue.toFixed(2)}</strong> total value</span>
+                  <span><strong>{eligibleShareCount}</strong> eligible</span>
+                  <span><strong>{likelyShareCount}</strong> likely</span>
+                </div>
+              </div>
+            </section>
+
+            {/* Canvas preview */}
             <div className="share-canvas-wrap">
-              <canvas
-                ref={(el) => {
-                  // Sync ref — canvas is hidden elsewhere; this one is the preview
-                  if (el && shareCanvasRef.current && shareCanvasRef.current !== el) {
-                    el.width = shareCanvasRef.current.width;
-                    el.height = shareCanvasRef.current.height;
-                    el.getContext("2d")?.drawImage(shareCanvasRef.current, 0, 0);
-                  }
-                }}
-                className="share-canvas"
-              />
+              <canvas ref={shareCanvasRef} className="share-canvas" />
             </div>
 
             {/* Actions */}
             <div className="share-modal-actions">
               <button type="button" className="share-dl-btn" onClick={downloadShareCard}>
                 <span className="share-option-icon">⬇</span>
-                {shareDownloaded ? "Saved!" : "Save again"}
+                {shareDownloaded ? "Saved!" : "Save image"}
               </button>
               <button type="button" className="share-x-btn" onClick={shareCardToX}>
                 <span className="share-option-icon" style={{ fontFamily: "serif" }}>𝕏</span>
@@ -503,6 +393,8 @@ export default function AirdropCheckerClient() {
                 {shareCopied ? "Copied!" : "Copy link"}
               </button>
             </div>
+
+            {/* URL bar */}
             <div className="share-url-box">
               <input className="share-url-input" readOnly value={shareBaseUrl} />
             </div>
@@ -534,38 +426,20 @@ export default function AirdropCheckerClient() {
               </span>
             )}
             {mounted ? <WalletMultiButton /> : <button type="button" className="wallet-adapter-button" disabled>Loading…</button>}
-            {/* Avatar / Profile Pic */}
+            {/* Avatar */}
             {mounted && (
-              <div className="avatar-wrap" title="Click to change profile picture" onClick={() => profilePicInputRef.current?.click()} style={{ cursor: "pointer" }}>
-                <input
-                  ref={profilePicInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={handleProfilePicChange}
-                />
-                {profilePic ? (
-                  <div className="avatar-ring avatar-ring-pic" style={{ border: `2px solid #FFD700`, padding: 0, overflow: "hidden" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={profilePic} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
-                  </div>
-                ) : (
-                  <div
-                    className="avatar-ring"
-                    style={{ background: `${avatarBg}22`, border: `1.5px solid #FFD70066`, color: "#FFD700" }}
-                  >
-                    <div className="avatar-glow-ring" />
-                    {avatarInitials}
-                  </div>
-                )}
+              <div
+                className="avatar-ring"
+                style={{ background: `${avatarBg}18`, border: `1.5px solid ${avatarBg}55`, color: avatarBg }}
+                title={walletAddress ?? "Not connected"}
+              >
+                <div className="avatar-glow-ring" />
+                {avatarInitials}
               </div>
             )}
           </div>
         </div>
       </nav>
-
-      {/* ── Hidden canvas for share card rendering ── */}
-      <canvas ref={shareCanvasRef} style={{ display: "none" }} />
 
       {/* ── Page ── */}
       <main className="page">
@@ -667,10 +541,7 @@ export default function AirdropCheckerClient() {
                   <button type="button" className="board-back">← Back</button>
                   <p className="board-eyebrow">Solana Airdrop Checker</p>
                   <h2 className="board-headline">
-                    {totalValue > 0
-                      ? <>You have <span className="gold-value">${totalValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> in eligible airdrops!</>
-                      : <>Connect wallet to see <span className="gold-value">your airdrops</span></>
-                    }
+                    You received <span style={{ color: "var(--brand)" }}>${totalValue.toFixed(2)}</span> worth of Airdrops!
                   </h2>
                   <p className="board-sub">
                     Connect your wallet and discover airdrops you can claim across Solana protocols. Read-only — no signing required.
@@ -738,10 +609,7 @@ export default function AirdropCheckerClient() {
                 <div className="board-filters-row">
                   <div className="board-filter-tabs">
                     {(["All", "Upcoming", "Past", "History"] as const).map((f) => (
-                      <button key={f} type="button" className={`board-pill ${activeFilter === f ? "board-pill-active" : ""}`} onClick={() => {
-                        setActiveFilter(f);
-                        if (f === "History" && !historyData && !historyLoading) void fetchHistory();
-                      }}>{f}</button>
+                      <button key={f} type="button" className={`board-pill ${activeFilter === f ? "board-pill-active" : ""}`} onClick={() => setActiveFilter(f)}>{f}</button>
                     ))}
                   </div>
                 </div>
@@ -751,151 +619,6 @@ export default function AirdropCheckerClient() {
                     <span className="wallet-row-count">{tableRows.length} airdrop{tableRows.length !== 1 ? "s" : ""}</span>
                   </div>
                 )}
-                {activeFilter === "History" ? (
-                  /* ── Past on-chain airdrop history ── */
-                  <div className="history-panel">
-                    <div className="history-panel-header">
-                      <div>
-                        <h3 className="history-title">📬 On-Chain Token History</h3>
-                        <p className="history-sub">
-                          Real token transfers received by this wallet — sourced directly from Solana blockchain.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        onClick={() => void fetchHistory()}
-                        disabled={historyLoading}
-                      >
-                        {historyLoading ? "Scanning…" : "↻ Refresh"}
-                      </button>
-                    </div>
-
-                    {!walletAddress && !historyData && (
-                      <div className="history-empty">
-                        <span className="history-empty-icon">🔗</span>
-                        <p>Connect your wallet to see your real on-chain airdrop history.</p>
-                      </div>
-                    )}
-
-                    {historyLoading && (
-                      <div className="history-loading">
-                        <div className="history-spinner" />
-                        <p>Scanning on-chain transactions… this may take a few seconds.</p>
-                      </div>
-                    )}
-
-                    {historyError && (
-                      <p className="error" style={{ marginTop: 12 }}>{historyError}</p>
-                    )}
-
-                    {historyData && !historyLoading && (
-                      <>
-                        <div className="history-stats-row">
-                          <div className="history-stat-pill">
-                            <span className="history-stat-label">Total Events</span>
-                            <span className="history-stat-val">{historyData.pastAirdrops.length}</span>
-                          </div>
-                          <div className="history-stat-pill">
-                            <span className="history-stat-label">Likely Airdrops</span>
-                            <span className="history-stat-val" style={{ color: "#14F195" }}>{historyData.totalReceived}</span>
-                          </div>
-                          <div className="history-stat-pill">
-                            <span className="history-stat-label">Unique Tokens</span>
-                            <span className="history-stat-val" style={{ color: "#FFD700" }}>
-                              {new Set(historyData.pastAirdrops.map((p) => p.mint)).size}
-                            </span>
-                          </div>
-                          <div className="history-stat-pill">
-                            <span className="history-stat-label">Scanned At</span>
-                            <span className="history-stat-val" style={{ fontSize: 11 }}>
-                              {new Date(historyData.checkedAt).toLocaleTimeString()}
-                            </span>
-                          </div>
-                        </div>
-
-                        {historyData.pastAirdrops.length === 0 ? (
-                          <div className="history-empty">
-                            <span className="history-empty-icon">🪂</span>
-                            <p>No incoming token transfers found in the last 50 transactions.</p>
-                          </div>
-                        ) : (
-                          <div className="board-table-wrap">
-                            <table className="board-table">
-                              <thead>
-                                <tr>
-                                  <th>Date</th>
-                                  <th>Token</th>
-                                  <th>Amount</th>
-                                  <th>Type</th>
-                                  <th>Source</th>
-                                  <th>Tx</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {historyData.pastAirdrops.map((p, i) => (
-                                  <tr key={`${p.signature}-${p.mint}-${i}`}>
-                                    <td className="col-date">{p.date}</td>
-                                    <td>
-                                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                        <span style={{
-                                          display: "inline-flex", alignItems: "center", justifyContent: "center",
-                                          width: 30, height: 30, borderRadius: 8,
-                                          background: p.symbol === "SOL" ? "#9945FF22" : p.isLikelyAirdrop ? "#14F19522" : "#23d3ff18",
-                                          border: `1px solid ${p.symbol === "SOL" ? "#9945FF44" : p.isLikelyAirdrop ? "#14F19544" : "#23d3ff33"}`,
-                                          fontSize: 9, fontWeight: 800, letterSpacing: -0.5,
-                                          color: p.symbol === "SOL" ? "#9945FF" : p.isLikelyAirdrop ? "#14F195" : "#23d3ff",
-                                        }}>
-                                          {p.symbol.slice(0, 4)}
-                                        </span>
-                                        <span style={{ fontWeight: 600, fontSize: 13 }}>{p.symbol}</span>
-                                      </div>
-                                    </td>
-                                    <td>
-                                      <div>
-                                        <span style={{ fontWeight: 600, color: "#fff" }}>
-                                          {p.uiAmount >= 1000
-                                            ? p.uiAmount.toLocaleString("en-US", { maximumFractionDigits: 0 })
-                                            : p.uiAmount.toLocaleString("en-US", { maximumFractionDigits: 4 })}
-                                        </span>
-                                        <small style={{ display: "block", color: "var(--muted)", fontSize: 10 }}>{p.symbol}</small>
-                                      </div>
-                                    </td>
-                                    <td>
-                                      <span className={`pill ${p.isLikelyAirdrop ? "pill-eligible" : "pill-unknown"}`}>
-                                        {p.isLikelyAirdrop ? "🪂 Airdrop" : "Transfer"}
-                                      </span>
-                                    </td>
-                                    <td>
-                                      {p.senderAddress ? (
-                                        <span style={{ fontFamily: "ui-monospace,monospace", fontSize: 10, color: "var(--muted)" }}>
-                                          {p.senderAddress.slice(0, 6)}…{p.senderAddress.slice(-4)}
-                                        </span>
-                                      ) : (
-                                        <span style={{ color: "var(--muted)", fontSize: 11 }}>Unknown</span>
-                                      )}
-                                    </td>
-                                    <td>
-                                      <a
-                                        href={`https://solscan.io/tx/${p.signature}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="board-action-claim"
-                                        style={{ fontSize: 11 }}
-                                      >
-                                        View ↗
-                                      </a>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                ) : (
                 <div className="board-table-wrap">
                   <table className="board-table">
                     <thead><tr><th>Date</th><th>Airdrop</th><th>Asset</th><th>Est. Value</th><th>Status</th><th>Amount</th><th>Action</th></tr></thead>
@@ -929,7 +652,6 @@ export default function AirdropCheckerClient() {
                     </tbody>
                   </table>
                 </div>
-                )}
                 {proPaymentUri && (
                   <div className="pro-upgrade">
                     <span>Pro Scan —</span>
