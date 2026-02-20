@@ -1721,3 +1721,121 @@ a:hover {
   padding: 0 4px;
 }
 
+
+/* ═══════════════════════════════════════════════════
+   MOBILE RESPONSIVE  (≤ 640px)
+═══════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+
+  /* ── Nav ── */
+  .top-nav-inner {
+    padding: 0 14px;
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+  }
+
+  .nav-logo {
+    margin-right: 0;
+    font-size: 14px;
+    padding: 10px 0;
+  }
+
+  .nav-tabs {
+    order: 3;
+    width: 100%;
+    border-top: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+    height: 40px;
+    gap: 0;
+  }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+
+  .nav-tab {
+    font-size: 12px;
+    padding: 0 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .nav-right {
+    gap: 6px;
+    padding: 6px 0;
+  }
+
+  .nav-right > span { display: none; }
+
+  .wallet-adapter-button {
+    font-size: 11px !important;
+    padding: 0 10px !important;
+    height: 32px !important;
+  }
+
+  /* ── Page ── */
+  .page { padding: 16px 14px 60px; }
+
+  /* ── Board ── */
+  .board-top { grid-template-columns: 1fr; }
+  .board-left { padding: 20px 16px 18px; border-right: none; border-bottom: 1px solid var(--border); }
+  .board-right { padding: 16px; }
+  .board-headline { font-size: 1.45rem; }
+  .board-right svg { width: 100%; height: auto; }
+
+  .board-filters-row { overflow-x: auto; scrollbar-width: none; }
+  .board-filters-row::-webkit-scrollbar { display: none; }
+  .board-filter-tabs { flex-wrap: nowrap; gap: 4px; }
+  .board-pill { font-size: 11.5px; padding: 5px 12px; white-space: nowrap; }
+
+  /* ── Table ── */
+  .board-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .board-table { min-width: 560px; font-size: 12px; }
+  .board-table th, .board-table td { padding: 8px 10px; }
+
+  /* ── Grids ── */
+  .summary-grid  { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .explorer-grid { grid-template-columns: 1fr; gap: 10px; }
+  .metrics-grid  { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+  /* ── Share modal ── */
+  .share-modal-card {
+    padding: 16px;
+    gap: 12px;
+    border-radius: 18px;
+    max-height: 92dvh;
+    overflow-y: auto;
+  }
+  .modal-title { font-size: 15px; }
+  .modal-sub   { font-size: 12px; }
+  .share-modal-actions { gap: 8px; flex-wrap: wrap; }
+  .share-dl-btn, .share-x-btn, .share-copy-btn {
+    font-size: 12.5px;
+    padding: 9px 12px;
+    min-width: 0;
+    flex: 1 1 40%;
+  }
+
+  /* ── News ticker ── */
+  .news-banner { padding: 0 14px; font-size: 12px; }
+
+  /* ── Address book ── */
+  .ab-card { flex-direction: column; gap: 8px; }
+  .ab-card-actions { justify-content: flex-start; flex-wrap: wrap; }
+
+  /* ── Panels ── */
+  .profile-panel { padding: 16px; }
+  .profile-wallet-add { flex-direction: column; }
+
+  /* ── Install banner ── */
+  .install-banner { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 14px; }
+}
+
+/* ── Medium (641–840px) ── */
+@media (min-width: 641px) and (max-width: 840px) {
+  .top-nav-inner { padding: 0 18px; }
+  .page { padding: 20px 18px 60px; }
+  .board-top { grid-template-columns: 1fr; }
+  .board-left { border-right: none; border-bottom: 1px solid var(--border); }
+  .explorer-grid { grid-template-columns: repeat(2, 1fr); }
+  .summary-grid  { grid-template-columns: repeat(2, 1fr); }
+}
