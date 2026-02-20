@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { AirdropEvaluation, WalletProfile } from "@/lib/types";
+import { AirdropEvaluation, PastAirdrop, WalletProfile } from "@/lib/types";
 import { AIRDROP_RULES } from "@/lib/airdrops";
 import StatusTabs from "@/components/StatusTabs";
 import AddressBook from "@/components/AddressBook";
@@ -23,6 +23,7 @@ type TickerItem = { id: string; title: string; url: string; sourceName: string }
 type WalletProfileGroup = { id: string; name: string; wallets: string[]; createdAt: string };
 type WalletScan = { address: string; ok: boolean; error?: string; eligibleCount: number; likelyCount: number };
 type GroupScanResult = { profileName: string; checkedAt: string; walletScans: WalletScan[]; aggregateResults: AirdropEvaluation[] };
+type HistoryResponse = { walletAddress: string; checkedAt: string; pastAirdrops: PastAirdrop[]; totalReceived: number };
 
 const PROFILES_KEY  = "airdrop_wallet_profiles_v1";
 const PROFILE_PIC_KEY = "epochradar_profile_pic_v1";
@@ -89,6 +90,9 @@ export default function AirdropCheckerClient() {
   const profilePicInputRef = useRef<HTMLInputElement>(null);
   const shareCanvasRef = useRef<HTMLCanvasElement>(null);
   const [explorerFilter, setExplorerFilter] = useState<"all" | "defi" | "nft" | "infrastructure" | "consumer">("all");
+  const [historyData, setHistoryData] = useState<HistoryResponse | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const walletAddress = useMemo(() => publicKey?.toBase58() ?? null, [publicKey]);
   const avatarInitials = walletAddress ? walletAddress.slice(0, 2).toUpperCase() : "ER";
@@ -238,6 +242,19 @@ export default function AirdropCheckerClient() {
       setGroupScan(null); setData(payload as ApiResponse);
     } catch (err) { setError(err instanceof Error ? err.message : "Unknown error"); }
     finally { setLoading(false); }
+  };
+
+  const fetchHistory = async (addr?: string) => {
+    const address = addr ?? walletAddress;
+    if (!address) { setHistoryError("Connect a wallet first."); return; }
+    setHistoryLoading(true); setHistoryError(null);
+    try {
+      const res = await fetch("/api/history", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletAddress: address }) });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || "Failed to fetch history");
+      setHistoryData(payload as HistoryResponse);
+    } catch (err) { setHistoryError(err instanceof Error ? err.message : "Unknown error"); }
+    finally { setHistoryLoading(false); }
   };
 
   const runDemo = (profile: WalletProfile) => {
@@ -721,7 +738,10 @@ export default function AirdropCheckerClient() {
                 <div className="board-filters-row">
                   <div className="board-filter-tabs">
                     {(["All", "Upcoming", "Past", "History"] as const).map((f) => (
-                      <button key={f} type="button" className={`board-pill ${activeFilter === f ? "board-pill-active" : ""}`} onClick={() => setActiveFilter(f)}>{f}</button>
+                      <button key={f} type="button" className={`board-pill ${activeFilter === f ? "board-pill-active" : ""}`} onClick={() => {
+                        setActiveFilter(f);
+                        if (f === "History" && !historyData && !historyLoading) void fetchHistory();
+                      }}>{f}</button>
                     ))}
                   </div>
                 </div>
@@ -731,6 +751,151 @@ export default function AirdropCheckerClient() {
                     <span className="wallet-row-count">{tableRows.length} airdrop{tableRows.length !== 1 ? "s" : ""}</span>
                   </div>
                 )}
+                {activeFilter === "History" ? (
+                  /* ── Past on-chain airdrop history ── */
+                  <div className="history-panel">
+                    <div className="history-panel-header">
+                      <div>
+                        <h3 className="history-title">📬 On-Chain Token History</h3>
+                        <p className="history-sub">
+                          Real token transfers received by this wallet — sourced directly from Solana blockchain.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={() => void fetchHistory()}
+                        disabled={historyLoading}
+                      >
+                        {historyLoading ? "Scanning…" : "↻ Refresh"}
+                      </button>
+                    </div>
+
+                    {!walletAddress && !historyData && (
+                      <div className="history-empty">
+                        <span className="history-empty-icon">🔗</span>
+                        <p>Connect your wallet to see your real on-chain airdrop history.</p>
+                      </div>
+                    )}
+
+                    {historyLoading && (
+                      <div className="history-loading">
+                        <div className="history-spinner" />
+                        <p>Scanning on-chain transactions… this may take a few seconds.</p>
+                      </div>
+                    )}
+
+                    {historyError && (
+                      <p className="error" style={{ marginTop: 12 }}>{historyError}</p>
+                    )}
+
+                    {historyData && !historyLoading && (
+                      <>
+                        <div className="history-stats-row">
+                          <div className="history-stat-pill">
+                            <span className="history-stat-label">Total Events</span>
+                            <span className="history-stat-val">{historyData.pastAirdrops.length}</span>
+                          </div>
+                          <div className="history-stat-pill">
+                            <span className="history-stat-label">Likely Airdrops</span>
+                            <span className="history-stat-val" style={{ color: "#14F195" }}>{historyData.totalReceived}</span>
+                          </div>
+                          <div className="history-stat-pill">
+                            <span className="history-stat-label">Unique Tokens</span>
+                            <span className="history-stat-val" style={{ color: "#FFD700" }}>
+                              {new Set(historyData.pastAirdrops.map((p) => p.mint)).size}
+                            </span>
+                          </div>
+                          <div className="history-stat-pill">
+                            <span className="history-stat-label">Scanned At</span>
+                            <span className="history-stat-val" style={{ fontSize: 11 }}>
+                              {new Date(historyData.checkedAt).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        {historyData.pastAirdrops.length === 0 ? (
+                          <div className="history-empty">
+                            <span className="history-empty-icon">🪂</span>
+                            <p>No incoming token transfers found in the last 50 transactions.</p>
+                          </div>
+                        ) : (
+                          <div className="board-table-wrap">
+                            <table className="board-table">
+                              <thead>
+                                <tr>
+                                  <th>Date</th>
+                                  <th>Token</th>
+                                  <th>Amount</th>
+                                  <th>Type</th>
+                                  <th>Source</th>
+                                  <th>Tx</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {historyData.pastAirdrops.map((p, i) => (
+                                  <tr key={`${p.signature}-${p.mint}-${i}`}>
+                                    <td className="col-date">{p.date}</td>
+                                    <td>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                        <span style={{
+                                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                          width: 30, height: 30, borderRadius: 8,
+                                          background: p.symbol === "SOL" ? "#9945FF22" : p.isLikelyAirdrop ? "#14F19522" : "#23d3ff18",
+                                          border: `1px solid ${p.symbol === "SOL" ? "#9945FF44" : p.isLikelyAirdrop ? "#14F19544" : "#23d3ff33"}`,
+                                          fontSize: 9, fontWeight: 800, letterSpacing: -0.5,
+                                          color: p.symbol === "SOL" ? "#9945FF" : p.isLikelyAirdrop ? "#14F195" : "#23d3ff",
+                                        }}>
+                                          {p.symbol.slice(0, 4)}
+                                        </span>
+                                        <span style={{ fontWeight: 600, fontSize: 13 }}>{p.symbol}</span>
+                                      </div>
+                                    </td>
+                                    <td>
+                                      <div>
+                                        <span style={{ fontWeight: 600, color: "#fff" }}>
+                                          {p.uiAmount >= 1000
+                                            ? p.uiAmount.toLocaleString("en-US", { maximumFractionDigits: 0 })
+                                            : p.uiAmount.toLocaleString("en-US", { maximumFractionDigits: 4 })}
+                                        </span>
+                                        <small style={{ display: "block", color: "var(--muted)", fontSize: 10 }}>{p.symbol}</small>
+                                      </div>
+                                    </td>
+                                    <td>
+                                      <span className={`pill ${p.isLikelyAirdrop ? "pill-eligible" : "pill-unknown"}`}>
+                                        {p.isLikelyAirdrop ? "🪂 Airdrop" : "Transfer"}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      {p.senderAddress ? (
+                                        <span style={{ fontFamily: "ui-monospace,monospace", fontSize: 10, color: "var(--muted)" }}>
+                                          {p.senderAddress.slice(0, 6)}…{p.senderAddress.slice(-4)}
+                                        </span>
+                                      ) : (
+                                        <span style={{ color: "var(--muted)", fontSize: 11 }}>Unknown</span>
+                                      )}
+                                    </td>
+                                    <td>
+                                      <a
+                                        href={`https://solscan.io/tx/${p.signature}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="board-action-claim"
+                                        style={{ fontSize: 11 }}
+                                      >
+                                        View ↗
+                                      </a>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ) : (
                 <div className="board-table-wrap">
                   <table className="board-table">
                     <thead><tr><th>Date</th><th>Airdrop</th><th>Asset</th><th>Est. Value</th><th>Status</th><th>Amount</th><th>Action</th></tr></thead>
@@ -764,6 +929,7 @@ export default function AirdropCheckerClient() {
                     </tbody>
                   </table>
                 </div>
+                )}
                 {proPaymentUri && (
                   <div className="pro-upgrade">
                     <span>Pro Scan —</span>

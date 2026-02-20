@@ -1,4 +1,19 @@
 export type EligibilityStatus = "eligible" | "likely" | "not_eligible" | "unknown";
+
+export type PastAirdrop = {
+  signature: string;
+  date: string;
+  timestamp: number;
+  mint: string;
+  mintShort: string;
+  symbol: string;
+  amount: number;
+  decimals: number;
+  uiAmount: number;
+  senderAddress: string | null;
+  isLikelyAirdrop: boolean;
+  reason: string;
+};
 export type SafetyGrade = "safe" | "caution" | "risky";
 
 export type AirdropTimeline = {
