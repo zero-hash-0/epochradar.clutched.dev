@@ -75,6 +75,9 @@ export default function AirdropCheckerClient() {
   const [shareDownloaded, setShareDownloaded] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [showInstall, setShowInstall] = useState(false);
+  const [shareSaved, setShareSaved] = useState(false);
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+  const profilePicInputRef = useRef<HTMLInputElement>(null);
   const shareCanvasRef = useRef<HTMLCanvasElement>(null);
   const [explorerFilter, setExplorerFilter] = useState<"all" | "defi" | "nft" | "infrastructure" | "consumer">("all");
 
