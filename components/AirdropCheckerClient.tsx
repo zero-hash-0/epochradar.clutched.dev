@@ -199,25 +199,28 @@ export default function AirdropCheckerClient() {
   }, [tableRows, chartRange]);
 
   const chartPolyline = useMemo(() => {
-    const width = 560;
+    const width = 520;
     const height = 200;
-    const padX = 20;
-    const padY = 20;
+    const padLeft = 36;
+    const padRight = 12;
+    const padTop = 16;
+    const padBottom = 16;
     const maxY = Math.max(...chartSeries.map((p) => p.y), 60);
-    const plotWidth = width - padX * 2;
-    const plotHeight = height - padY * 2;
+    const plotWidth = width - padLeft - padRight;
+    const plotHeight = height - padTop - padBottom;
     const points = chartSeries.map((point, index) => {
-      const x = padX + (chartSeries.length === 1 ? 0 : (index / (chartSeries.length - 1)) * plotWidth);
-      const y = padY + plotHeight - (point.y / maxY) * plotHeight;
-      return `${x},${y}`;
+      const x = padLeft + (chartSeries.length === 1 ? plotWidth / 2 : (index / (chartSeries.length - 1)) * plotWidth);
+      const y = padTop + plotHeight - (point.y / maxY) * plotHeight;
+      return { x, y };
     });
-    const last = points[points.length - 1]?.split(",") || ["0", "0"];
-    // Y axis labels
+    const last = points[points.length - 1] ?? { x: padLeft, y: padTop + plotHeight };
+    const pointsStr = points.map((p) => `${p.x},${p.y}`).join(" ");
+    const fillPath = `M ${padLeft} ${padTop + plotHeight} L ${points.map((p) => `${p.x} ${p.y}`).join(" L ")} L ${last.x} ${padTop + plotHeight} Z`;
     const yLabels = [0, 15, 30, 45, 60].map((val) => ({
       val,
-      y: padY + plotHeight - (val / maxY) * plotHeight,
+      y: padTop + plotHeight - (val / maxY) * plotHeight,
     }));
-    return { width, height, points: points.join(" "), lastX: Number(last[0]), lastY: Number(last[1]), yLabels };
+    return { width, height, pointsStr, fillPath, lastX: last.x, lastY: last.y, yLabels };
   }, [chartSeries]);
 
   const runCheck = async () => {
@@ -399,11 +402,8 @@ export default function AirdropCheckerClient() {
                 </button>
               </div>
 
-              {/* Connect + check */}
+              {/* Check button */}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-                {mounted ? <WalletMultiButton /> : (
-                  <button type="button" className="wallet-adapter-button" disabled>Loading…</button>
-                )}
                 <button type="button" className="check-btn" onClick={runCheck} disabled={!connected || loading}>
                   {loading ? "Checking…" : "Check Eligibility"}
                 </button>
@@ -447,28 +447,25 @@ export default function AirdropCheckerClient() {
               </div>
 
               {/* Chart with Y-axis labels */}
-              <svg viewBox={`0 0 ${chartPolyline.width} ${chartPolyline.height}`} aria-label="Airdrop value trend" style={{ overflow: "visible" }}>
+              <svg viewBox={`0 0 ${chartPolyline.width} ${chartPolyline.height}`} aria-label="Airdrop value trend">
                 <defs>
                   <linearGradient id="chartFill" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="rgba(35,211,255,0.25)" />
+                    <stop offset="0%" stopColor="rgba(35,211,255,0.22)" />
                     <stop offset="100%" stopColor="rgba(35,211,255,0)" />
                   </linearGradient>
                 </defs>
                 {/* Y-axis labels */}
                 {chartPolyline.yLabels.map(({ val, y }) => (
-                  <text key={val} x={chartPolyline.width - 2} y={y + 4} textAnchor="end" fill="var(--muted)" fontSize="10">
+                  <text key={val} x={32} y={y + 4} textAnchor="end" fill="#555" fontSize="9" fontFamily="ui-monospace, monospace">
                     ${val}
                   </text>
                 ))}
                 {/* Fill area */}
-                <path
-                  d={`M 20 ${chartPolyline.height - 20} L ${chartPolyline.points.split(" ").map((p) => p.replace(",", " ")).join(" L ")} L ${chartPolyline.width - 20} ${chartPolyline.height - 20} Z`}
-                  fill="url(#chartFill)"
-                />
+                <path d={chartPolyline.fillPath} fill="url(#chartFill)" />
                 {/* Line */}
-                <polyline fill="none" stroke="#23d3ff" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" points={chartPolyline.points} />
+                <polyline fill="none" stroke="#23d3ff" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" points={chartPolyline.pointsStr} />
                 {/* Dot at end */}
-                <circle cx={chartPolyline.lastX} cy={chartPolyline.lastY} r="5" fill="#0d0d0d" stroke="#23d3ff" strokeWidth="2.5" />
+                <circle cx={chartPolyline.lastX} cy={chartPolyline.lastY} r="4" fill="#161616" stroke="#23d3ff" strokeWidth="2" />
               </svg>
 
               <div className="board-toggle">
