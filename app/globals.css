@@ -1398,15 +1398,22 @@ a:hover {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(6px);
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  animation: fadeIn 160ms ease;
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* keep old .modal-card for any other use */
 .modal-card {
   background: var(--surface);
   border: 1px solid var(--border-strong);
@@ -1417,82 +1424,164 @@ a:hover {
   position: relative;
 }
 
+/* ── New share modal card ── */
+.share-modal-card {
+  background: #111;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
+  padding: 24px;
+  width: 100%;
+  max-width: 580px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: slideUp 200ms ease;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(20,241,149,0.06);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.share-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .modal-title {
   font-size: 18px;
   font-weight: 700;
   color: #fff;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
 }
 
 .modal-sub {
   font-size: 13px;
   color: var(--muted);
-  margin: 0 0 20px;
+  margin: 0;
 }
 
 .modal-close {
-  position: absolute;
-  top: 16px; right: 16px;
-  background: none;
-  border: none;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
   color: var(--muted);
-  font-size: 18px;
+  font-size: 16px;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 8px;
-  transition: color 120ms ease;
+  padding: 6px 10px;
+  border-radius: 10px;
+  transition: color 120ms ease, background 120ms ease;
+  flex-shrink: 0;
+  line-height: 1;
 }
-.modal-close:hover { color: #fff; }
+.modal-close:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
-.share-options {
-  display: grid;
-  gap: 10px;
+/* Canvas preview */
+.share-canvas-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: #0d0d0d;
+  line-height: 0;
 }
 
-.share-option-btn {
+.share-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 14px;
+}
+
+/* Action buttons row */
+.share-modal-actions {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-2);
-  border-radius: var(--radius);
-  padding: 12px 16px;
-  cursor: pointer;
-  font-family: inherit;
-  color: var(--ink);
-  font-size: 13.5px;
-  transition: border-color 120ms ease, background 120ms ease;
-  text-align: left;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.share-option-btn:hover {
+.share-dl-btn,
+.share-x-btn,
+.share-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 140ms ease, transform 120ms ease;
+  flex: 1;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.share-dl-btn:hover,
+.share-x-btn:hover,
+.share-copy-btn:hover {
+  opacity: 0.86;
+  transform: translateY(-1px);
+}
+
+.share-dl-btn {
+  background: var(--brand);
+  color: #041a0a;
+  border: none;
+}
+
+.share-x-btn {
+  background: #fff;
+  color: #0d0d0d;
+  border: none;
+}
+
+.share-copy-btn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border-strong);
+}
+
+.share-copy-btn:hover {
+  color: #fff;
   border-color: var(--brand-border);
-  background: rgba(20,241,149,0.04);
 }
 
 .share-option-icon {
-  font-size: 20px;
-  width: 28px;
-  text-align: center;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .share-url-box {
-  margin-top: 16px;
   display: flex;
-  gap: 8px;
+  gap: 0;
 }
 
 .share-url-input {
   flex: 1;
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
   padding: 9px 12px;
-  color: var(--muted);
-  font-size: 12px;
+  color: rgba(255,255,255,0.35);
+  font-size: 11.5px;
   font-family: ui-monospace, monospace;
   outline: none;
+  width: 100%;
 }
+
+/* legacy share-options (kept for fallback) */
+.share-options { display: grid; gap: 10px; }
+.share-option-btn {
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--border-strong); background: var(--surface-2);
+  border-radius: var(--radius); padding: 12px 16px; cursor: pointer;
+  font-family: inherit; color: var(--ink); font-size: 13.5px;
+  transition: border-color 120ms ease, background 120ms ease; text-align: left;
+}
+.share-option-btn:hover { border-color: var(--brand-border); background: rgba(20,241,149,0.04); }
 
 /* ── Address book ── */
 .ab-shell { display: grid; gap: 16px; }

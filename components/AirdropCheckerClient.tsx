@@ -9,6 +9,7 @@ import { AIRDROP_RULES } from "@/lib/airdrops";
 import StatusTabs from "@/components/StatusTabs";
 import AddressBook from "@/components/AddressBook";
 import { evaluateWalletAirdrops } from "@/lib/evaluator";
+import { drawShareCard } from "@/lib/shareCard";
 
 /* ─── Types ─────────────────────────────────────────── */
 type ApiResponse = {
@@ -71,8 +72,10 @@ export default function AirdropCheckerClient() {
   const [activeFilter, setActiveFilter] = useState<"All" | "Upcoming" | "Past" | "History">("All");
   const [showShare, setShowShare] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [shareDownloaded, setShareDownloaded] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [showInstall, setShowInstall] = useState(false);
+  const shareCanvasRef = useRef<HTMLCanvasElement>(null);
   const [explorerFilter, setExplorerFilter] = useState<"all" | "defi" | "nft" | "infrastructure" | "consumer">("all");
 
   const walletAddress = useMemo(() => publicKey?.toBase58() ?? null, [publicKey]);
@@ -266,6 +269,45 @@ export default function AirdropCheckerClient() {
     try { await navigator.clipboard.writeText(shareBaseUrl); setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); } catch { /* ignore */ }
   };
 
+  /* ── Draw share card whenever modal opens ── */
+  useEffect(() => {
+    if (!showShare || !shareCanvasRef.current) return;
+    const eligible = tableRows.filter((r) => r.isEligible);
+    drawShareCard(shareCanvasRef.current, {
+      walletAddress,
+      eligibleCount: eligible.length,
+      likelyCount: tableRows.filter((r) => r.status === "Likely").length,
+      totalValue,
+      topAirdrops: tableRows.slice(0, 4).map((r) => ({
+        project: r.project,
+        status: r.status,
+        estimatedValue: r.estimatedValue,
+      })),
+      solPrice: solPrice?.priceUsd,
+    });
+  }, [showShare, tableRows, totalValue, walletAddress, solPrice]);
+
+  const downloadShareCard = () => {
+    const canvas = shareCanvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = "epochradar-airdrops.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+    setShareDownloaded(true);
+    setTimeout(() => setShareDownloaded(false), 2500);
+  };
+
+  const shareCardToX = () => {
+    const text = `🪂 I found ${tableRows.filter((r) => r.isEligible).length} eligible Solana airdrops worth $${totalValue.toFixed(2)}! Check yours on EpochRadar:`;
+    window.open(
+      `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareBaseUrl)}`,
+      "_blank",
+      "noreferrer",
+    );
+    setShowShare(false);
+  };
+
   const handleInstall = async () => {
     if (!deferredPrompt) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -304,30 +346,39 @@ export default function AirdropCheckerClient() {
       {/* ── Share modal ── */}
       {showShare && (
         <div className="modal-backdrop" onClick={() => setShowShare(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setShowShare(false)}>×</button>
-            <h2 className="modal-title">Share your results</h2>
-            <p className="modal-sub">Let others know what airdrops you found on Solana.</p>
-            <div className="share-options">
-              <a
-                href={`https://x.com/intent/tweet?text=${encodeURIComponent(`🪂 Found ${tableRows.filter((r) => r.isEligible).length} eligible Solana airdrops worth $${totalValue.toFixed(2)}! Check yours on EpochRadar:`)}&url=${encodeURIComponent(shareBaseUrl)}`}
-                target="_blank" rel="noreferrer"
-                className="share-option-btn"
-                onClick={() => setShowShare(false)}
-              >
-                <span className="share-option-icon">𝕏</span>
-                <span>Share on X (Twitter)</span>
-              </a>
-              <button type="button" className="share-option-btn" onClick={copyShareUrl}>
+          <div className="share-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="share-modal-header">
+              <div>
+                <h2 className="modal-title">Share your results</h2>
+                <p className="modal-sub">Save your airdrop card or post it on X.</p>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setShowShare(false)}>×</button>
+            </div>
+
+            {/* Canvas preview */}
+            <div className="share-canvas-wrap">
+              <canvas ref={shareCanvasRef} className="share-canvas" />
+            </div>
+
+            {/* Actions */}
+            <div className="share-modal-actions">
+              <button type="button" className="share-dl-btn" onClick={downloadShareCard}>
+                <span className="share-option-icon">⬇</span>
+                {shareDownloaded ? "Saved!" : "Save image"}
+              </button>
+              <button type="button" className="share-x-btn" onClick={shareCardToX}>
+                <span className="share-option-icon" style={{ fontFamily: "serif" }}>𝕏</span>
+                Post on X
+              </button>
+              <button type="button" className="share-copy-btn" onClick={copyShareUrl}>
                 <span className="share-option-icon">🔗</span>
-                <span>{shareCopied ? "✓ Copied to clipboard!" : "Copy link"}</span>
+                {shareCopied ? "Copied!" : "Copy link"}
               </button>
             </div>
+
+            {/* URL bar */}
             <div className="share-url-box">
               <input className="share-url-input" readOnly value={shareBaseUrl} />
-              <button type="button" className="check-btn" style={{ minHeight: 36, fontSize: 12, padding: "0 14px" }} onClick={copyShareUrl}>
-                {shareCopied ? "Copied!" : "Copy"}
-              </button>
             </div>
           </div>
         </div>
