@@ -8,6 +8,7 @@ type TabKey = (typeof TAB_ORDER)[number];
 
 type Props = {
   results: AirdropEvaluation[];
+  shareBaseUrl: string;
 };
 
 const STAGES = ["announced", "snapshot", "claim_open", "claim_end"] as const;
@@ -39,7 +40,7 @@ function stageLabel(stage: (typeof STAGES)[number], item: AirdropEvaluation) {
   return item.timeline?.claimEndsAt || "End";
 }
 
-export default function StatusTabs({ results }: Props) {
+export default function StatusTabs({ results, shareBaseUrl }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("all");
 
   const grouped = useMemo(() => {
@@ -164,6 +165,24 @@ export default function StatusTabs({ results }: Props) {
                   </a>
                   <a href={item.sourceUrl} target="_blank" rel="noreferrer">
                     Source
+                  </a>
+                  <a
+                    href={`https://x.com/intent/tweet?text=${encodeURIComponent(
+                      `SOL airdrop signal: ${item.project} is ${item.status.replaceAll("_", " ")} (${item.confidence}% confidence).`,
+                    )}&url=${encodeURIComponent(`${shareBaseUrl}/?airdrop=${item.id}`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Share on X
+                  </a>
+                  <a
+                    href={`https://dial.to/?action=solana-action:${encodeURIComponent(
+                      `${shareBaseUrl}/api/check`,
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Blink-style link
                   </a>
                   <span className={`risk risk-${item.riskLevel}`}>risk: {item.riskLevel}</span>
                 </div>

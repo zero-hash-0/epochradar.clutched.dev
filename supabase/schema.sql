@@ -35,3 +35,23 @@ create policy "Public read active airdrops"
 on public.airdrops
 for select
 using (is_active = true);
+create table if not exists public.airdrop_leads (
+  id text primary key,
+  project text not null,
+  title text not null,
+  summary text not null,
+  url text not null,
+  source_id text not null,
+  source_name text not null,
+  published_at timestamptz not null,
+  score numeric not null,
+  tags text[] not null default '{}',
+  discovered_at timestamptz not null default now()
+);
+
+alter table public.airdrop_leads enable row level security;
+
+create policy "Public read discovery leads"
+on public.airdrop_leads
+for select
+using (true);

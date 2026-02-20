@@ -15,6 +15,18 @@ type AdminRow = {
   sourceUrl?: string;
 };
 
+type DiscoveryLead = {
+  id: string;
+  project: string;
+  title: string;
+  summary: string;
+  url: string;
+  sourceName: string;
+  publishedAt: string;
+  score: number;
+  tags: string[];
+};
+
 const initialForm = {
   id: "",
   project: "",
@@ -32,6 +44,8 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [form, setForm] = useState(initialForm);
+  const [leads, setLeads] = useState<DiscoveryLead[]>([]);
+  const [scanning, setScanning] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -56,7 +70,36 @@ export default function AdminPage() {
 
   useEffect(() => {
     void load();
+    void loadDiscovery();
   }, []);
+
+  const loadDiscovery = async () => {
+    try {
+      const res = await fetch("/api/discovery", { cache: "no-store" });
+      const payload = await res.json();
+      if (res.ok) {
+        setLeads(payload.leads || []);
+      }
+    } catch {
+      // Non-blocking in admin UI.
+    }
+  };
+
+  const runDiscovery = async () => {
+    setScanning(true);
+    try {
+      const res = await fetch("/api/admin/discovery/run", { method: "POST" });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error || "Discovery scan failed");
+      }
+      setLeads(payload.leads || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown discovery error");
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -190,7 +233,52 @@ export default function AdminPage() {
           ))}
         </ul>
       </section>
-      <footer className="credit">Made with Love ❤️ by @notT0KY0</footer>
+      <section className="results-shell">
+        <div className="result-top-row">
+          <h2>Discovery Radar</h2>
+          <button type="button" className="ghost-btn" onClick={runDiscovery} disabled={scanning}>
+            {scanning ? "Scanning..." : "Run scan now"}
+          </button>
+        </div>
+        <p className="empty-state">
+          High-coverage feed from Solana ecosystem sources. Always verify claim URLs before listing.
+        </p>
+        <ul className="result-list">
+          {leads.slice(0, 12).map((lead) => (
+            <li key={lead.id} className="result-card">
+              <div className="result-top-row">
+                <strong>{lead.project}</strong>
+                <span className="pill">score {lead.score}</span>
+              </div>
+              <p className="meta-row">
+                {lead.sourceName} | {new Date(lead.publishedAt).toLocaleString()}
+              </p>
+              <p className="reason">{lead.title}</p>
+              <p className="reason">{lead.summary}</p>
+              <div className="chip-row">
+                {lead.tags.map((tag) => (
+                  <span key={tag} className="proof-chip proof-met">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <div className="links-row">
+                <a href={lead.url} target="_blank" rel="noreferrer">
+                  Open source post
+                </a>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <footer className="credit">
+        <span>Made with Love</span>
+        <span className="credit-heart" aria-hidden="true">❤️</span>
+        <span>by</span>
+        <a href="https://x.com/notT0KY0" target="_blank" rel="noreferrer">
+          @notT0KY0
+        </a>
+      </footer>
     </main>
   );
 }
