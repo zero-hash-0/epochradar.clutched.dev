@@ -1,6 +1,16 @@
 /**
- * EpochRadar Share Card — Full-Bleed Poster Edition
- * SpongeBob fills every pixel. Cinematic scrims. Giant gold money number.
+ * EpochRadar Share Card — Pro Edition
+ *
+ * Layout (1080 × 1080 square):
+ *   • Full-bleed background image (SpongeBob / custom art), cover-fit
+ *   • Gradient scrims: heavy at top + bottom, clear window in the middle third
+ *   • Top strip  : logo left | wallet chip right
+ *   • Middle     : image shows through — pure art zone
+ *   • Lower half : headline value, subtitle, divider, 3 stat chips, airdrop list
+ *   • Bottom     : watermark
+ *
+ * Design language: premium fintech card — tight grid, monospace accents,
+ * muted glass panels, strong typographic hierarchy. Gold/green/purple brand palette.
  */
 
 export type ShareCardData = {
@@ -13,38 +23,44 @@ export type ShareCardData = {
   profilePic?: string;
 };
 
-const GOLD1  = "#FFD700";
-const GOLD2  = "#FFA500";
-const GOLD3  = "#FFE566";
-const PURPLE = "#9945FF";
+/* ─── palette ──────────────────────────────────── */
+const GOLD   = "#FFD700";
+const GOLD2  = "#FFA040";
 const GREEN  = "#14F195";
+const PURPLE = "#9945FF";
 const TEAL   = "#00C2FF";
+const WHITE  = "#FFFFFF";
 
-function seededRand(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) & 0xffffffff;
-    return (s >>> 0) / 0xffffffff;
-  };
-}
-
-function roundRect(
+/* ─── helpers ──────────────────────────────────── */
+function rr(
   ctx: CanvasRenderingContext2D,
-  x: number, y: number,
-  w: number, h: number,
-  r: number,
+  x: number, y: number, w: number, h: number, r: number,
 ) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
   ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
   ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
   ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
+}
+
+/* subtle noise — draws 300 random semi-transparent pixels for texture */
+function drawNoise(ctx: CanvasRenderingContext2D, W: number, H: number, alpha: number) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  for (let i = 0; i < 300; i++) {
+    const nx = Math.random() * W;
+    const ny = Math.random() * H;
+    const v  = Math.random() > 0.5 ? 255 : 0;
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(nx, ny, 1, 1);
+  }
+  ctx.restore();
 }
 
 export function drawShareCard(
@@ -61,358 +77,355 @@ export function drawShareCard(
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const rand = seededRand(42);
-
-  /* ══════════════════════════════════════════
-     LAYER 1 — Dark base
-  ══════════════════════════════════════════ */
-  ctx.fillStyle = "#06050e";
+  /* ══════════════════════════════════════════════════════
+     STEP 1 — Dark base
+  ══════════════════════════════════════════════════════ */
+  ctx.fillStyle = "#06050d";
   ctx.fillRect(0, 0, W, H);
 
-  /* ══════════════════════════════════════════
-     LAYER 2 — Full-bleed SpongeBob (cover fit)
-  ══════════════════════════════════════════ */
+  /* ══════════════════════════════════════════════════════
+     STEP 2 — Full-bleed background art, cover-fit
+  ══════════════════════════════════════════════════════ */
   if (bgImage && bgImage.naturalWidth > 0) {
     const iw = bgImage.naturalWidth;
     const ih = bgImage.naturalHeight;
-    const scale = Math.max(W / iw, H / ih);   // cover: fill the whole card
+    // cover: whichever axis overflows, crop it centered
+    const scale = Math.max(W / iw, H / ih);
     const dw = iw * scale;
     const dh = ih * scale;
     const dx = (W - dw) / 2;
-    // Anchor slightly above center so the face/action stays visible
-    const dy = (H - dh) * 0.35;
+    // Push slightly up so subject appears in upper-centre, text lands below
+    const dy = (H - dh) * 0.28;
     ctx.drawImage(bgImage, dx, dy, dw, dh);
   } else {
-    // Fallback vivid gradient
-    const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0,   "#1a0a3a");
-    grad.addColorStop(0.5, "#0d1a2a");
-    grad.addColorStop(1,   "#0a1f14");
-    ctx.fillStyle = grad;
+    // Vivid fallback gradient
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0,   "#14003a");
+    g.addColorStop(0.5, "#001a30");
+    g.addColorStop(1,   "#001a10");
+    ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
 
-  /* ══════════════════════════════════════════
-     LAYER 3 — Cinematic scrims (keep image visible in middle)
-  ══════════════════════════════════════════ */
-  // Top bar (logo strip) — deep dark
-  const topScrim = ctx.createLinearGradient(0, 0, 0, 200);
-  topScrim.addColorStop(0,   "rgba(4,3,10,0.92)");
-  topScrim.addColorStop(0.6, "rgba(4,3,10,0.55)");
-  topScrim.addColorStop(1,   "rgba(0,0,0,0)");
-  ctx.fillStyle = topScrim;
-  ctx.fillRect(0, 0, W, 200);
+  /* ══════════════════════════════════════════════════════
+     STEP 3 — Cinematic scrims
+     Top 220px  : opaque → clear  (logo strip)
+     Bottom 55% : clear → opaque  (data panel)
+     Sides      : thin edge vignette
+  ══════════════════════════════════════════════════════ */
+  const sTop = ctx.createLinearGradient(0, 0, 0, 220);
+  sTop.addColorStop(0,   "rgba(4,3,11,0.96)");
+  sTop.addColorStop(0.7, "rgba(4,3,11,0.50)");
+  sTop.addColorStop(1,   "rgba(4,3,11,0)");
+  ctx.fillStyle = sTop;
+  ctx.fillRect(0, 0, W, 220);
 
-  // Bottom panel — deep dark for text
-  const botScrim = ctx.createLinearGradient(0, H * 0.42, 0, H);
-  botScrim.addColorStop(0,    "rgba(0,0,0,0)");
-  botScrim.addColorStop(0.18, "rgba(4,3,10,0.72)");
-  botScrim.addColorStop(0.45, "rgba(4,3,10,0.91)");
-  botScrim.addColorStop(1,    "rgba(4,3,10,0.98)");
-  ctx.fillStyle = botScrim;
-  ctx.fillRect(0, H * 0.42, W, H * 0.58);
+  const sBot = ctx.createLinearGradient(0, H * 0.38, 0, H);
+  sBot.addColorStop(0,    "rgba(4,3,11,0)");
+  sBot.addColorStop(0.15, "rgba(4,3,11,0.65)");
+  sBot.addColorStop(0.38, "rgba(4,3,11,0.90)");
+  sBot.addColorStop(1,    "rgba(4,3,11,0.98)");
+  ctx.fillStyle = sBot;
+  ctx.fillRect(0, H * 0.38, W, H * 0.62);
 
-  // Thin left + right edge vignettes
-  const vigL = ctx.createLinearGradient(0, 0, 80, 0);
-  vigL.addColorStop(0, "rgba(0,0,0,0.50)");
-  vigL.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = vigL;
-  ctx.fillRect(0, 0, 80, H);
+  const sL = ctx.createLinearGradient(0, 0, 60, 0);
+  sL.addColorStop(0, "rgba(0,0,0,0.55)");
+  sL.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = sL; ctx.fillRect(0, 0, 60, H);
 
-  const vigR = ctx.createLinearGradient(W - 80, 0, W, 0);
-  vigR.addColorStop(0, "rgba(0,0,0,0)");
-  vigR.addColorStop(1, "rgba(0,0,0,0.50)");
-  ctx.fillStyle = vigR;
-  ctx.fillRect(W - 80, 0, 80, H);
+  const sR = ctx.createLinearGradient(W - 60, 0, W, 0);
+  sR.addColorStop(0, "rgba(0,0,0,0)");
+  sR.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = sR; ctx.fillRect(W - 60, 0, 60, H);
 
-  /* ══════════════════════════════════════════
-     LAYER 4 — Colour glows on top of image
-  ══════════════════════════════════════════ */
-  // Gold sweep from top-left
-  const glowGold = ctx.createRadialGradient(100, 100, 0, 100, 100, 700);
-  glowGold.addColorStop(0, "rgba(255,185,0,0.22)");
-  glowGold.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = glowGold;
-  ctx.fillRect(0, 0, W, H);
+  /* ══════════════════════════════════════════════════════
+     STEP 4 — Subtle colour ambient glows (low opacity)
+  ══════════════════════════════════════════════════════ */
+  // Gold burst top-left (brand warmth)
+  const gA = ctx.createRadialGradient(0, 0, 0, 0, 0, 650);
+  gA.addColorStop(0, "rgba(255,190,0,0.18)");
+  gA.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = gA; ctx.fillRect(0, 0, W, H);
 
-  // Green sweep from bottom-right
-  const glowGreen = ctx.createRadialGradient(W - 80, H - 80, 0, W - 80, H - 80, 550);
-  glowGreen.addColorStop(0, "rgba(20,241,149,0.16)");
-  glowGreen.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = glowGreen;
-  ctx.fillRect(0, 0, W, H);
+  // Green bloom bottom-right
+  const gB = ctx.createRadialGradient(W, H, 0, W, H, 520);
+  gB.addColorStop(0, "rgba(20,241,149,0.13)");
+  gB.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = gB; ctx.fillRect(0, 0, W, H);
 
-  // Purple mid-right accent
-  const glowPurp = ctx.createRadialGradient(W, H * 0.5, 0, W, H * 0.5, 400);
-  glowPurp.addColorStop(0, "rgba(153,69,255,0.14)");
-  glowPurp.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = glowPurp;
-  ctx.fillRect(0, 0, W, H);
+  // Purple centre-right
+  const gC = ctx.createRadialGradient(W * 0.85, H * 0.5, 0, W * 0.85, H * 0.5, 380);
+  gC.addColorStop(0, "rgba(153,69,255,0.11)");
+  gC.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = gC; ctx.fillRect(0, 0, W, H);
 
-  /* ══════════════════════════════════════════
-     LAYER 5 — Diagonal shimmer lines
-  ══════════════════════════════════════════ */
+  /* ══════════════════════════════════════════════════════
+     STEP 5 — Subtle noise texture (adds depth / pro feel)
+  ══════════════════════════════════════════════════════ */
+  drawNoise(ctx, W, H, 0.025);
+
+  /* ══════════════════════════════════════════════════════
+     STEP 6 — TOP STRIP
+     Left : logo mark + wordmark + tagline
+     Right: wallet chip (+ profile pic if present)
+  ══════════════════════════════════════════════════════ */
+  const PAD = 52;
+
+  // ── Logo mark (concentric circles, Solana-ish) ──
+  const lx = PAD + 18, ly = 60;
+
   ctx.save();
-  for (let i = 0; i < 12; i++) {
-    const lx = -400 + i * 180;
-    ctx.strokeStyle = `rgba(255,215,0,${0.01 + rand() * 0.03})`;
-    ctx.lineWidth = 1 + rand() * 2;
-    ctx.beginPath();
-    ctx.moveTo(lx, 0);
-    ctx.lineTo(lx + H * 0.9, H);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  /* ══════════════════════════════════════════
-     LAYER 6 — Floating sparkle dots
-  ══════════════════════════════════════════ */
-  const dots = [GOLD1, GOLD2, GREEN, PURPLE, TEAL, "#fff", "#FF6B6B"];
-  for (let i = 0; i < 50; i++) {
-    const bx = rand() * W;
-    const by = rand() * H;
-    const br = 1.2 + rand() * 3.5;
-    ctx.save();
-    ctx.globalAlpha = 0.07 + rand() * 0.22;
-    const dc = dots[Math.floor(rand() * dots.length)];
-    ctx.shadowColor = dc;
-    ctx.shadowBlur  = 6;
-    ctx.fillStyle   = dc;
-    ctx.beginPath();
-    ctx.arc(bx, by, br, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  /* ══════════════════════════════════════════
-     TOP LEFT — EpochRadar logo + tagline
-  ══════════════════════════════════════════ */
-  const lx = 52, ly = 60;
-
-  // Halo glow
-  ctx.save();
-  ctx.shadowColor = GOLD1;
-  ctx.shadowBlur  = 32;
-  ctx.fillStyle = "rgba(255,215,0,0.30)";
-  ctx.beginPath();
-  ctx.arc(lx, ly, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Rings
-  ctx.fillStyle = PURPLE;
-  ctx.beginPath(); ctx.arc(lx, ly, 9, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = GOLD1; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.arc(lx, ly, 14, 0, Math.PI * 2); ctx.stroke();
-  ctx.strokeStyle = GREEN; ctx.lineWidth = 1.5;
+  ctx.shadowColor = GOLD;
+  ctx.shadowBlur  = 22;
+  // outer green ring
+  ctx.strokeStyle = GREEN + "88"; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(lx, ly, 20, 0, Math.PI * 2); ctx.stroke();
+  // mid gold ring
+  ctx.strokeStyle = GOLD + "cc"; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(lx, ly, 13, 0, Math.PI * 2); ctx.stroke();
+  // inner purple fill
+  ctx.fillStyle = PURPLE;
+  ctx.beginPath(); ctx.arc(lx, ly, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 
-  // Name
-  ctx.font = "800 28px ui-monospace,'SF Mono',monospace";
-  ctx.fillStyle = "#fff";
+  // ── Wordmark ──
+  ctx.font = "800 30px ui-monospace,'SF Mono',Menlo,monospace";
+  ctx.fillStyle = WHITE;
   ctx.textAlign = "left";
-  ctx.shadowColor = "rgba(0,0,0,0.8)";
-  ctx.shadowBlur  = 10;
-  ctx.fillText("EpochRadar", 82, 54);
+  ctx.shadowColor = "rgba(0,0,0,0.9)";
+  ctx.shadowBlur  = 12;
+  ctx.fillText("EpochRadar", lx + 28, ly + 10);
   ctx.shadowBlur = 0;
 
-  // Tagline
-  ctx.font = "500 14px -apple-system,sans-serif";
-  ctx.fillStyle = GOLD2;
-  ctx.fillText("✦ Solana Airdrop Scanner", 83, 76);
+  ctx.font = "500 13px -apple-system,BlinkMacSystemFont,sans-serif";
+  ctx.fillStyle = "rgba(255,215,0,0.70)";
+  ctx.fillText("✦ Solana Airdrop Scanner", lx + 28, ly + 30);
 
-  /* ══════════════════════════════════════════
-     TOP RIGHT — Wallet chip
-  ══════════════════════════════════════════ */
-  const walletLabel = data.walletAddress
+  // ── Wallet chip ──
+  const wLabel = data.walletAddress
     ? `${data.walletAddress.slice(0, 6)}…${data.walletAddress.slice(-4)}`
     : "Demo Wallet";
-  ctx.font = "600 14px ui-monospace,monospace";
-  const chipW = ctx.measureText(walletLabel).width + 36;
-  const chipX = W - chipW - 40;
-  const chipY = 34;
-  roundRect(ctx, chipX, chipY, chipW, 36, 10);
-  ctx.fillStyle = "rgba(255,215,0,0.13)";
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,215,0,0.42)";
-  ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.fillStyle = GOLD3;
-  ctx.textAlign = "left";
-  ctx.fillText(walletLabel, chipX + 18, chipY + 24);
+  ctx.font = "600 13px ui-monospace,monospace";
+  const chipW = ctx.measureText(wLabel).width + 32;
+  const chipX = W - PAD - chipW;
+  const chipY = ly - 18;
 
-  /* Profile pic */
+  rr(ctx, chipX, chipY, chipW, 36, 10);
+  ctx.fillStyle = "rgba(255,215,0,0.10)"; ctx.fill();
+  ctx.strokeStyle = "rgba(255,215,0,0.35)"; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = "rgba(255,230,100,0.90)";
+  ctx.textAlign = "left";
+  ctx.fillText(wLabel, chipX + 16, chipY + 23);
+
+  // ── Profile pic ──
   if (profileImg) {
-    const pr = 26, px2 = chipX - pr - 14, py2 = chipY + 18;
+    const pr = 22;
+    const px2 = chipX - pr - 12;
+    const py2 = chipY + 18;
     ctx.save();
     ctx.beginPath(); ctx.arc(px2, py2, pr, 0, Math.PI * 2); ctx.clip();
     ctx.drawImage(profileImg, px2 - pr, py2 - pr, pr * 2, pr * 2);
     ctx.restore();
     ctx.save();
-    ctx.shadowColor = GOLD1; ctx.shadowBlur = 12;
-    ctx.strokeStyle = GOLD1; ctx.lineWidth = 2.5;
+    ctx.shadowColor = GOLD; ctx.shadowBlur = 10;
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(px2, py2, pr + 1, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
 
-  /* ══════════════════════════════════════════
-     CENTRE — MASSIVE dollar value
-     Placed in the lower half so the SpongeBob
-     image is fully visible above it
-  ══════════════════════════════════════════ */
+  /* ══════════════════════════════════════════════════════
+     STEP 7 — MAIN DATA PANEL (lower ~52% of card)
+
+     Layout inside panel (top → bottom):
+       Eyebrow label
+       ★ Dollar value — massive gradient type
+       Subtitle
+       ── Hairline divider ──
+       3 stat chips in a row
+       ── Hairline divider ──
+       Up to 4 airdrop rows (compact list style)
+       Watermark
+  ══════════════════════════════════════════════════════ */
+  const panelTop = H * 0.49;    // where data starts
+  const valueY   = panelTop + 130;
+
+  // ── Eyebrow ──
+  ctx.font = "700 14px -apple-system,sans-serif";
+  ctx.fillStyle = "rgba(255,215,0,0.60)";
+  ctx.textAlign = "center";
+  // letter-spacing hack: spread manually
+  const eyeText = "YOUR  ELIGIBLE  AIRDROPS";
+  ctx.fillText(eyeText, W / 2, panelTop + 72);
+
+  // ── Gold glow behind the value ──
+  ctx.save();
+  const vg = ctx.createRadialGradient(W / 2, valueY - 10, 0, W / 2, valueY - 10, 300);
+  vg.addColorStop(0, "rgba(255,200,0,0.26)");
+  vg.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, valueY - 110, W, 170);
+  ctx.restore();
+
+  // ── Dollar value ──
   const valueStr = data.totalValue > 0
     ? `$${data.totalValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : "$0.00";
 
-  const vy = 700; // vertical anchor for the big number
-
-  // Eyebrow
-  ctx.font = "700 15px -apple-system,sans-serif";
-  ctx.fillStyle = "rgba(255,215,0,0.70)";
-  ctx.textAlign = "center";
-  ctx.fillText("✦  YOUR ELIGIBLE AIRDROPS  ✦", W / 2, vy - 32);
-
-  // Soft glow behind number
   ctx.save();
-  const vg = ctx.createRadialGradient(W / 2, vy, 0, W / 2, vy, 320);
-  vg.addColorStop(0, "rgba(255,200,0,0.30)");
-  vg.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, vy - 120, W, 200);
-  ctx.restore();
-
-  // Giant gradient number — 130px bold
-  ctx.save();
-  ctx.font = "900 130px -apple-system,BlinkMacSystemFont,sans-serif";
+  ctx.font = "900 120px -apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif";
   const tw = ctx.measureText(valueStr).width;
-  const tGrad = ctx.createLinearGradient(W / 2 - tw / 2, 0, W / 2 + tw / 2, 0);
-  tGrad.addColorStop(0,    GOLD3);
-  tGrad.addColorStop(0.25, GOLD1);
-  tGrad.addColorStop(0.55, GOLD2);
-  tGrad.addColorStop(0.80, GREEN);
-  tGrad.addColorStop(1,    TEAL);
-  ctx.fillStyle = tGrad;
+  // Horizontal gradient across the number
+  const tg = ctx.createLinearGradient(W / 2 - tw / 2, 0, W / 2 + tw / 2, 0);
+  tg.addColorStop(0,    "#FFE566");
+  tg.addColorStop(0.35, "#FFD700");
+  tg.addColorStop(0.65, "#FFA040");
+  tg.addColorStop(0.85, "#14F195");
+  tg.addColorStop(1,    "#00C2FF");
+  ctx.fillStyle = tg;
   ctx.textAlign = "center";
-  ctx.shadowColor = "rgba(255,200,0,0.65)";
-  ctx.shadowBlur  = 38;
-  ctx.fillText(valueStr, W / 2, vy);
+  ctx.shadowColor = "rgba(255,200,0,0.55)";
+  ctx.shadowBlur  = 32;
+  ctx.fillText(valueStr, W / 2, valueY);
   ctx.restore();
 
-  // Subtitle under value
-  ctx.font = "400 22px -apple-system,sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.60)";
+  // ── Subtitle ──
+  ctx.font = "400 21px -apple-system,sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.52)";
   ctx.textAlign = "center";
-  ctx.shadowColor = "rgba(0,0,0,0.9)";
-  ctx.shadowBlur  = 8;
-  ctx.fillText("worth of Solana airdrops found  🪂", W / 2, vy + 48);
+  ctx.shadowColor = "rgba(0,0,0,0.9)"; ctx.shadowBlur = 6;
+  ctx.fillText("worth of Solana airdrops identified  🪂", W / 2, valueY + 46);
   ctx.shadowBlur = 0;
 
-  /* ══════════════════════════════════════════
-     STATS PILLS — Eligible / Likely / Total
-  ══════════════════════════════════════════ */
-  const statsY = vy + 96;
-  const pills = [
-    { label: "ELIGIBLE",  val: data.eligibleCount,                     col: GOLD1,  bg: "rgba(255,215,0,0.14)",  border: "rgba(255,215,0,0.45)"  },
-    { label: "LIKELY",    val: data.likelyCount,                       col: GREEN,  bg: "rgba(20,241,149,0.12)", border: "rgba(20,241,149,0.40)" },
-    { label: "TOTAL",     val: data.eligibleCount + data.likelyCount,  col: PURPLE, bg: "rgba(153,69,255,0.12)", border: "rgba(153,69,255,0.40)" },
+  // ── Hairline divider ──
+  const div1Y = valueY + 78;
+  const divG = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+  divG.addColorStop(0,    "rgba(255,215,0,0)");
+  divG.addColorStop(0.2,  "rgba(255,215,0,0.35)");
+  divG.addColorStop(0.8,  "rgba(20,241,149,0.25)");
+  divG.addColorStop(1,    "rgba(20,241,149,0)");
+  ctx.strokeStyle = divG; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD, div1Y); ctx.lineTo(W - PAD, div1Y); ctx.stroke();
+
+  /* ── 3 Stat chips ── */
+  const chipStats = [
+    { label: "ELIGIBLE",  val: String(data.eligibleCount),                         col: GOLD,   bg: "rgba(255,215,0,0.10)",  bdr: "rgba(255,215,0,0.32)"  },
+    { label: "LIKELY",    val: String(data.likelyCount),                            col: GREEN,  bg: "rgba(20,241,149,0.09)", bdr: "rgba(20,241,149,0.30)" },
+    { label: "TOTAL",     val: String(data.eligibleCount + data.likelyCount),       col: PURPLE, bg: "rgba(153,69,255,0.09)", bdr: "rgba(153,69,255,0.30)" },
   ];
 
-  const pW = 234, pH = 76, pGap = 16;
-  const totalW = pills.length * pW + (pills.length - 1) * pGap;
-  let px = (W - totalW) / 2;
+  const csY   = div1Y + 18;
+  const csH   = 72;
+  const csGap = 14;
+  const csTot = chipStats.length;
+  const csW   = Math.floor((W - PAD * 2 - csGap * (csTot - 1)) / csTot);
+  chipStats.forEach((cs, i) => {
+    const cx = PAD + i * (csW + csGap);
+    rr(ctx, cx, csY, csW, csH, 14);
+    ctx.fillStyle = cs.bg; ctx.fill();
+    ctx.strokeStyle = cs.bdr; ctx.lineWidth = 1.5; ctx.stroke();
 
-  for (const p of pills) {
-    roundRect(ctx, px, statsY, pW, pH, 16);
-    ctx.fillStyle = p.bg; ctx.fill();
-    ctx.strokeStyle = p.border; ctx.lineWidth = 1.5; ctx.stroke();
-
-    ctx.font = "700 13px -apple-system,sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    // label
+    ctx.font = "600 11px -apple-system,sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.38)";
     ctx.textAlign = "center";
-    ctx.fillText(p.label, px + pW / 2, statsY + 24);
+    ctx.fillText(cs.label, cx + csW / 2, csY + 22);
 
+    // value
     ctx.save();
-    ctx.shadowColor = p.col; ctx.shadowBlur = 14;
-    ctx.font = "800 34px -apple-system,sans-serif";
-    ctx.fillStyle = p.col;
-    ctx.fillText(String(p.val), px + pW / 2, statsY + 62);
+    ctx.font = "800 32px -apple-system,sans-serif";
+    ctx.shadowColor = cs.col; ctx.shadowBlur = 12;
+    ctx.fillStyle   = cs.col;
+    ctx.fillText(cs.val, cx + csW / 2, csY + 58);
     ctx.restore();
+  });
 
-    px += pW + pGap;
-  }
+  // ── Second hairline divider ──
+  const div2Y = csY + csH + 18;
+  ctx.strokeStyle = divG; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD, div2Y); ctx.lineTo(W - PAD, div2Y); ctx.stroke();
 
-  /* ══════════════════════════════════════════
-     AIRDROP CARDS — top 4
-  ══════════════════════════════════════════ */
-  const top = data.topAirdrops.slice(0, 4);
-  if (top.length > 0) {
-    const cardsY = statsY + pH + 20;
-    const margin = 36;
-    const cW = Math.floor((W - margin * 2 - (top.length - 1) * 10) / top.length);
-    const cH = 88;
+  /* ── Airdrop list (up to 4 rows) ──
+     Each row: colour dot | project name     | status pill | est. value
+  */
+  const top4 = data.topAirdrops.slice(0, 4);
+  if (top4.length > 0) {
+    const listY  = div2Y + 16;
+    const rowH   = 44;
+    const rowGap = 8;
 
-    ctx.font = "700 13px -apple-system,sans-serif";
-    ctx.fillStyle = "rgba(255,215,0,0.55)";
+    // Section label
+    ctx.font = "600 11px -apple-system,sans-serif";
+    ctx.fillStyle = "rgba(255,215,0,0.45)";
     ctx.textAlign = "left";
-    ctx.fillText("✦  TOP AIRDROPS", margin, cardsY - 10);
+    ctx.fillText("TOP AIRDROPS", PAD, listY - 4);
 
-    top.forEach((item, i) => {
-      const cx = margin + i * (cW + 10);
-      const col = item.status === "Eligible" ? GOLD1 : item.status === "Likely" ? GREEN : TEAL;
-      const colBg  = col === GOLD1 ? "rgba(255,215,0,0.10)"  : col === GREEN ? "rgba(20,241,149,0.10)" : "rgba(0,194,255,0.10)";
+    top4.forEach((item, i) => {
+      const ry = listY + 10 + i * (rowH + rowGap);
+      const col = item.status === "Eligible" ? GOLD : item.status === "Likely" ? GREEN : TEAL;
 
-      roundRect(ctx, cx, cardsY, cW, cH, 12);
-      ctx.fillStyle = colBg; ctx.fill();
-      ctx.strokeStyle = col + "55"; ctx.lineWidth = 1.5; ctx.stroke();
+      // row background
+      rr(ctx, PAD, ry, W - PAD * 2, rowH, 10);
+      ctx.fillStyle = "rgba(255,255,255,0.03)"; ctx.fill();
+      ctx.strokeStyle = col + "25"; ctx.lineWidth = 1; ctx.stroke();
 
-      // Icon
+      // left colour dot
       ctx.save();
-      ctx.shadowColor = col; ctx.shadowBlur = 14;
-      ctx.fillStyle = col + "20";
-      ctx.beginPath(); ctx.arc(cx + 22, cardsY + 25, 15, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-      ctx.strokeStyle = col + "88"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(cx + 22, cardsY + 25, 15, 0, Math.PI * 2); ctx.stroke();
-      ctx.font = "800 11px -apple-system,sans-serif";
-      ctx.fillStyle = col; ctx.textAlign = "center";
-      ctx.fillText(item.project.slice(0, 2).toUpperCase(), cx + 22, cardsY + 29);
-
-      const nm = item.project.length > 11 ? item.project.slice(0, 10) + "…" : item.project;
-      ctx.font = "700 13px -apple-system,sans-serif";
-      ctx.fillStyle = "#fff"; ctx.textAlign = "left";
-      ctx.fillText(nm, cx + 8, cardsY + 56);
-
-      ctx.font = "700 13px -apple-system,sans-serif";
+      ctx.shadowColor = col; ctx.shadowBlur = 8;
       ctx.fillStyle = col;
-      ctx.fillText(item.estimatedValue ?? "TBD", cx + 8, cardsY + 74);
+      ctx.beginPath();
+      ctx.arc(PAD + 18, ry + rowH / 2, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
 
-      // Bottom glow bar
-      const bG = ctx.createLinearGradient(cx, 0, cx + cW, 0);
-      bG.addColorStop(0,   col + "00");
-      bG.addColorStop(0.5, col + "aa");
-      bG.addColorStop(1,   col + "00");
-      ctx.fillStyle = bG;
-      ctx.fillRect(cx, cardsY + cH - 3, cW, 3);
+      // project name
+      ctx.font = "600 15px -apple-system,sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      ctx.textAlign = "left";
+      const nm = item.project.length > 18 ? item.project.slice(0, 17) + "…" : item.project;
+      ctx.fillText(nm, PAD + 36, ry + rowH / 2 + 5);
+
+      // status pill (right-aligned, before value)
+      const statusStr = item.status;
+      ctx.font = "700 11px -apple-system,sans-serif";
+      const stW = ctx.measureText(statusStr).width + 18;
+      const stX = W - PAD - 110 - stW;
+      rr(ctx, stX, ry + rowH / 2 - 11, stW, 22, 6);
+      ctx.fillStyle = col + "22"; ctx.fill();
+      ctx.strokeStyle = col + "55"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.textAlign = "center";
+      ctx.fillText(statusStr, stX + stW / 2, ry + rowH / 2 + 4);
+
+      // est. value (far right)
+      ctx.font = "700 15px ui-monospace,monospace";
+      ctx.fillStyle = col;
+      ctx.textAlign = "right";
+      ctx.fillText(item.estimatedValue ?? "TBD", W - PAD, ry + rowH / 2 + 5);
     });
   }
 
-  /* ══════════════════════════════════════════
-     OUTER BORDER — gold glow
-  ══════════════════════════════════════════ */
+  /* ══════════════════════════════════════════════════════
+     STEP 8 — Outer border (gradient glow)
+  ══════════════════════════════════════════════════════ */
   ctx.save();
-  ctx.shadowColor = GOLD1; ctx.shadowBlur = 24;
-  const border = ctx.createLinearGradient(0, 0, W, H);
-  border.addColorStop(0,    GOLD1 + "ee");
-  border.addColorStop(0.35, PURPLE + "88");
-  border.addColorStop(0.70, TEAL + "66");
-  border.addColorStop(1,    GREEN + "cc");
-  ctx.strokeStyle = border; ctx.lineWidth = 3.5;
-  roundRect(ctx, 1.5, 1.5, W - 3, H - 3, 24);
+  ctx.shadowColor = GOLD;
+  ctx.shadowBlur  = 20;
+  const bdG = ctx.createLinearGradient(0, 0, W, H);
+  bdG.addColorStop(0,    GOLD   + "dd");
+  bdG.addColorStop(0.35, PURPLE + "77");
+  bdG.addColorStop(0.70, TEAL   + "55");
+  bdG.addColorStop(1,    GREEN  + "bb");
+  ctx.strokeStyle = bdG;
+  ctx.lineWidth   = 3;
+  rr(ctx, 1.5, 1.5, W - 3, H - 3, 24);
   ctx.stroke();
   ctx.restore();
 
-  /* Watermark */
-  ctx.font = "600 14px ui-monospace,monospace";
-  ctx.fillStyle = "rgba(255,215,0,0.32)";
+  /* ══════════════════════════════════════════════════════
+     STEP 9 — Watermark
+  ══════════════════════════════════════════════════════ */
+  ctx.font = "500 13px ui-monospace,monospace";
+  ctx.fillStyle = "rgba(255,215,0,0.28)";
   ctx.textAlign = "center";
-  ctx.fillText("epochradar.com  ✦  Solana Airdrop Checker", W / 2, H - 18);
+  ctx.fillText("epochradar.com  ✦  Check your Solana airdrops", W / 2, H - 20);
 }

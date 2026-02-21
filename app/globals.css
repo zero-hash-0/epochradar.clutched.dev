@@ -1888,114 +1888,170 @@ a:hover {
 ═══════════════════════════════════════════════════ */
 @media (max-width: 640px) {
 
-  /* ── Nav ── */
+  /* ── Nav ──
+     Row 1: logo | nav-right (wallet + avatar)
+     Row 2: tabs (full width, centered)
+  */
   .top-nav-inner {
-    padding: 0 14px;
+    padding: 0 12px;
     height: auto;
-    min-height: 52px;
+    min-height: 48px;
     flex-wrap: wrap;
+    gap: 0;
+    align-items: center;
   }
 
   .nav-logo {
-    margin-right: 0;
-    font-size: 14px;
-    padding: 10px 0;
+    margin-right: auto;   /* push nav-right to the right */
+    font-size: 13.5px;
+    padding: 8px 0;
+    gap: 6px;
   }
 
-  .nav-tabs {
-    order: 3;
-    width: 100%;
-    border-top: 1px solid var(--border);
-    overflow-x: auto;
-    scrollbar-width: none;
-    height: 40px;
-    gap: 0;
-    justify-content: center;
-  }
-  .nav-tabs::-webkit-scrollbar { display: none; }
-
-  .nav-tab {
-    font-size: 12px;
-    padding: 0 14px;
-    white-space: nowrap;
-    flex-shrink: 0;
-    flex: 1;
-    justify-content: center;
-    max-width: 130px;
-  }
+  /* SOL price hidden on mobile — saves space */
+  .nav-right > span { display: none; }
 
   .nav-right {
     gap: 6px;
     padding: 6px 0;
+    flex-shrink: 0;
   }
 
-  .nav-right > span { display: none; }
-
+  /* Wallet button — compact */
   .wallet-adapter-button {
     font-size: 11px !important;
-    padding: 0 10px !important;
-    height: 32px !important;
+    padding: 0 9px !important;
+    height: 30px !important;
+    min-width: 0 !important;
+    white-space: nowrap;
+  }
+
+  /* Avatar — smaller */
+  .avatar-ring {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 10px !important;
+  }
+
+  /* Tabs — full-width row below logo/wallet */
+  .nav-tabs {
+    order: 3;
+    width: 100%;
+    border-top: 1px solid var(--border);
+    height: 38px;
+    gap: 0;
+    justify-content: stretch;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+
+  .nav-tab {
+    flex: 1;
+    font-size: 11.5px;
+    padding: 0 8px;
+    white-space: nowrap;
+    justify-content: center;
+    min-width: 80px;
   }
 
   /* ── Page ── */
-  .page { padding: 16px 14px 60px; }
+  .page { padding: 14px 12px 60px; }
 
-  /* ── Board ── */
+  /* ── Portfolio board ── */
+  .portfolio-board { border-radius: 14px; }
   .board-top { grid-template-columns: 1fr; }
-  .board-left { padding: 20px 16px 18px; border-right: none; border-bottom: 1px solid var(--border); }
-  .board-right { padding: 16px; }
-  .board-headline { font-size: 1.45rem; }
-  .board-right svg { width: 100%; height: auto; }
 
-  .board-filters-row { overflow-x: auto; scrollbar-width: none; }
+  .board-left {
+    padding: 18px 14px 16px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .board-headline { font-size: 1.35rem; line-height: 1.3; }
+  .board-sub { font-size: 12.5px; }
+  .board-actions { gap: 8px; flex-wrap: wrap; }
+  .share-btn { font-size: 12.5px; padding: 8px 14px; }
+
+  /* Check button full-width */
+  .check-btn { width: 100%; justify-content: center; }
+
+  .board-right { padding: 14px; }
+  .board-right svg { width: 100%; height: auto; }
+  .chart-total-value { font-size: 20px; }
+
+  /* Filter pills — scrollable */
+  .board-filters-row { overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .board-filters-row::-webkit-scrollbar { display: none; }
   .board-filter-tabs { flex-wrap: nowrap; gap: 4px; }
-  .board-pill { font-size: 11.5px; padding: 5px 12px; white-space: nowrap; }
+  .board-pill { font-size: 11px; padding: 5px 10px; white-space: nowrap; border-radius: 6px; }
 
-  /* ── Table ── */
-  .board-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .board-table { min-width: 560px; font-size: 12px; }
-  .board-table th, .board-table td { padding: 8px 10px; }
+  /* ── Table — horizontal scroll ── */
+  .board-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 0; }
+  .board-table { min-width: 520px; font-size: 11.5px; }
+  .board-table th, .board-table td { padding: 7px 8px; }
 
-  /* ── Grids ── */
+  /* ── Summary / metrics grids ── */
   .summary-grid  { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .explorer-grid { grid-template-columns: 1fr; gap: 10px; }
   .metrics-grid  { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 
-  /* ── Share modal ── */
+  /* ── Share modal — bottom-sheet style ── */
+  .modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
   .share-modal-card {
-    padding: 16px;
+    width: 100%;
+    max-width: 100%;
+    max-height: 88dvh;
+    border-radius: 20px 20px 0 0;
+    padding: 16px 14px;
     gap: 12px;
-    border-radius: 18px;
-    max-height: 92dvh;
     overflow-y: auto;
   }
   .modal-title { font-size: 15px; }
-  .modal-sub   { font-size: 12px; }
-  .share-modal-actions { gap: 8px; flex-wrap: wrap; }
+  .modal-sub   { font-size: 11.5px; }
+  /* Canvas preview is square — constrain height so it doesn't overflow */
+  .share-canvas-wrap { max-height: 55vw; overflow: hidden; }
+  .share-canvas      { width: 100%; height: auto; }
+  .share-modal-actions { gap: 8px; }
   .share-dl-btn, .share-x-btn, .share-copy-btn {
-    font-size: 12.5px;
-    padding: 9px 12px;
+    font-size: 12px;
+    padding: 9px 10px;
     min-width: 0;
-    flex: 1 1 40%;
+    flex: 1 1 30%;
   }
+  .share-url-box { display: none; } /* hide URL bar on mobile — saves space */
 
   /* ── News ticker ── */
-  .news-banner { padding: 0 14px; font-size: 12px; }
+  .news-banner { padding: 0 12px; }
 
   /* ── Address book ── */
   .ab-card { flex-direction: column; gap: 8px; }
   .ab-card-actions { justify-content: flex-start; flex-wrap: wrap; }
 
-  /* ── Panels ── */
-  .profile-panel { padding: 16px; }
+  /* ── Profile panel ── */
+  .profile-panel { padding: 14px; }
   .profile-wallet-add { flex-direction: column; }
 
+  /* ── Wallet profile cards ── */
+  .saved-profiles { display: grid; gap: 10px; }
+
+  /* ── History panel ── */
+  .history-stats-row { gap: 8px; }
+  .history-stat-pill { min-width: 70px; padding: 8px 10px; }
+  .history-stat-val  { font-size: 16px; }
+
   /* ── Install banner ── */
-  .install-banner { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 14px; }
+  .install-banner { flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 12px; }
+
+  /* ── Demo row ── */
+  .demo-row { flex-wrap: wrap; gap: 6px; }
+  .ghost-btn { font-size: 12px; padding: 6px 12px; }
 }
 
-/* ── Medium (641–840px) ── */
+/* ── Medium tablets (641–840px) ── */
 @media (min-width: 641px) and (max-width: 840px) {
   .top-nav-inner { padding: 0 18px; }
   .page { padding: 20px 18px 60px; }
@@ -2003,6 +2059,8 @@ a:hover {
   .board-left { border-right: none; border-bottom: 1px solid var(--border); }
   .explorer-grid { grid-template-columns: repeat(2, 1fr); }
   .summary-grid  { grid-template-columns: repeat(2, 1fr); }
+  .board-table-wrap { overflow-x: auto; }
+  .board-table { min-width: 520px; }
 }
 
 /* ── White hairline border fix (mobile Safari) ── */
