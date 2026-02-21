@@ -75,9 +75,6 @@ export default function AirdropCheckerClient() {
   const [shareDownloaded, setShareDownloaded] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [showInstall, setShowInstall] = useState(false);
-  const [shareSaved, setShareSaved] = useState(false);
-  const [profilePic, setProfilePic] = useState<string | null>(null);
-  const profilePicInputRef = useRef<HTMLInputElement>(null);
   const shareCanvasRef = useRef<HTMLCanvasElement>(null);
   const [explorerFilter, setExplorerFilter] = useState<"all" | "defi" | "nft" | "infrastructure" | "consumer">("all");
 
@@ -274,83 +271,30 @@ export default function AirdropCheckerClient() {
     try { await navigator.clipboard.writeText(shareBaseUrl); setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); } catch { /* ignore */ }
   };
 
-  /* ── Build share card data ── */
-  const buildCardData = useCallback(() => ({
-    walletAddress,
-    eligibleCount: tableRows.filter((r) => r.isEligible).length,
-    likelyCount: tableRows.filter((r) => r.status === "Likely").length,
-    totalValue,
-    topAirdrops: tableRows.slice(0, 4).map((r) => ({
-      project: r.project,
-      status: r.status,
-      estimatedValue: r.estimatedValue,
-    })),
-    solPrice: solPrice?.priceUsd,
-    profilePic: profilePic ?? undefined,
-  }), [walletAddress, tableRows, totalValue, solPrice, profilePic]);
-
-  /* ── Draw onto hidden canvas then auto-save PNG ── */
-  const renderAndSave = useCallback(() => {
-    const canvas = shareCanvasRef.current;
-    if (!canvas) return;
-    const cardData = buildCardData();
-
-    const finish = (sponge?: HTMLImageElement, profImg?: HTMLImageElement) => {
-      drawShareCard(canvas, cardData, sponge, profImg);
-      // auto-save
-      const link = document.createElement("a");
-      link.download = `epochradar-${Date.now()}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-      setShareSaved(true);
-      setTimeout(() => setShareSaved(false), 2500);
-    };
-
-    // Load SpongeBob bg
-    const sponge = new window.Image();
-    sponge.crossOrigin = "anonymous";
-    sponge.onload = () => {
-      if (profilePic) {
-        const profImg = new window.Image();
-        profImg.onload = () => finish(sponge, profImg);
-        profImg.onerror = () => finish(sponge);
-        profImg.src = profilePic;
-      } else {
-        finish(sponge);
-      }
-    };
-    sponge.onerror = () => {
-      if (profilePic) {
-        const profImg = new window.Image();
-        profImg.onload = () => finish(undefined, profImg);
-        profImg.onerror = () => finish();
-        profImg.src = profilePic;
-      } else {
-        finish();
-      }
-    };
-    sponge.src = `/spongebob.jpg?v=${Date.now()}`;
-  }, [buildCardData, profilePic]);
-
-  /* ── Draw share card whenever modal opens (for preview) ── */
+  /* ── Draw share card whenever modal opens ── */
   useEffect(() => {
     if (!showShare || !shareCanvasRef.current) return;
-    const cardData = buildCardData();
-    const sponge = new window.Image();
-    sponge.crossOrigin = "anonymous";
-    sponge.onload = () => {
-      if (profilePic) {
-        const profImg = new window.Image();
-        profImg.onload = () => drawShareCard(shareCanvasRef.current!, cardData, sponge, profImg);
-        profImg.onerror = () => drawShareCard(shareCanvasRef.current!, cardData, sponge);
-        profImg.src = profilePic;
-      } else {
-        drawShareCard(shareCanvasRef.current!, cardData, sponge);
-      }
+    let cancelled = false;
+    const eligible = tableRows.filter((r) => r.isEligible);
+    const canvas = shareCanvasRef.current;
+    void drawShareCard(canvas, {
+      walletAddress,
+      eligibleCount: eligible.length,
+      likelyCount: likelyShareCount,
+      totalValue,
+      topAirdrops: tableRows.slice(0, 4).map((r) => ({
+        project: r.project,
+        status: r.status,
+        estimatedValue: r.estimatedValue,
+      })),
+      solPrice: solPrice?.priceUsd,
+    }).then(() => {
+      if (cancelled) return;
+    });
+    return () => {
+      cancelled = true;
     };
-    sponge.onerror = () => drawShareCard(shareCanvasRef.current!, cardData);
-    sponge.src = `/spongebob.jpg?v=${Date.now()}`;
-  }, [showShare, buildCardData, profilePic]);
+  }, [showShare, tableRows, totalValue, walletAddress, solPrice, likelyShareCount]);
 
   const downloadShareCard = () => {
     const canvas = shareCanvasRef.current;
@@ -420,40 +364,25 @@ export default function AirdropCheckerClient() {
               <button type="button" className="modal-close" onClick={() => setShowShare(false)}>×</button>
             </div>
 
-            {/* Canvas lives directly in the modal — draw into it on mount */}
+            <section className="share-scene">
+              <div className="share-scene-overlay" />
+              <div className="share-scene-content">
+                <p className="share-scene-kicker">High-Risk Hunter Mode</p>
+                <h3>Tactical Drop Report</h3>
+                <p>
+                  Blended cinematic style with your live wallet snapshot and claim-ready opportunities.
+                </p>
+                <div className="share-scene-stats">
+                  <span><strong>${totalValue.toFixed(2)}</strong> total value</span>
+                  <span><strong>{eligibleShareCount}</strong> eligible</span>
+                  <span><strong>{likelyShareCount}</strong> likely</span>
+                </div>
+              </div>
+            </section>
+
+            {/* Canvas preview */}
             <div className="share-canvas-wrap">
-              <canvas
-                ref={(el) => {
-                  if (!el) return;
-                  // Point the shared ref at this modal canvas
-                  (shareCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = el;
-                  // Draw immediately
-                  const cardData = buildCardData();
-                  const sponge = new window.Image();
-                  sponge.crossOrigin = "anonymous";
-                  const render = (s?: HTMLImageElement, p?: HTMLImageElement) => {
-                    drawShareCard(el, cardData, s, p);
-                  };
-                  sponge.onload = () => {
-                    if (profilePic) {
-                      const pi = new window.Image();
-                      pi.onload = () => render(sponge, pi);
-                      pi.onerror = () => render(sponge);
-                      pi.src = profilePic;
-                    } else { render(sponge); }
-                  };
-                  sponge.onerror = () => {
-                    if (profilePic) {
-                      const pi = new window.Image();
-                      pi.onload = () => render(undefined, pi);
-                      pi.onerror = () => render();
-                      pi.src = profilePic;
-                    } else { render(); }
-                  };
-                  sponge.src = `/spongebob.jpg?v=${Date.now()}`;
-                }}
-                className="share-canvas"
-              />
+              <canvas ref={shareCanvasRef} className="share-canvas" />
             </div>
 
             {/* Actions */}
@@ -518,8 +447,6 @@ export default function AirdropCheckerClient() {
           </div>
         </div>
       </nav>
-
-      {/* share canvas lives inside the modal (ref assigned on mount there) */}
 
       {/* ── Page ── */}
       <main className="page">

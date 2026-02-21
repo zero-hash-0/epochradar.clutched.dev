@@ -1,6 +1,6 @@
 /**
- * EpochRadar Share Card — Full-Bleed Poster Edition
- * SpongeBob fills every pixel. Cinematic scrims. Giant gold money number.
+ * Draws a shareable airdrop results card onto a canvas.
+ * Tactical dark style with neon-cyan + amber accents.
  */
 
 export type ShareCardData = {
@@ -10,23 +10,12 @@ export type ShareCardData = {
   totalValue: number;
   topAirdrops: Array<{ project: string; status: string; estimatedValue?: string }>;
   solPrice?: number;
-  profilePic?: string;
 };
 
-const GOLD1  = "#FFD700";
-const GOLD2  = "#FFA500";
-const GOLD3  = "#FFE566";
-const PURPLE = "#9945FF";
-const GREEN  = "#14F195";
-const TEAL   = "#00C2FF";
-
-function seededRand(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) & 0xffffffff;
-    return (s >>> 0) / 0xffffffff;
-  };
-}
+const SOL_NEON  = "#23D3FF";
+const SOL_LIME  = "#B8EF6D";
+const SOL_AMBER = "#FFC46D";
+const HERO_IMAGE_PATH = "/share-bg.jpg";
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -50,369 +39,273 @@ function roundRect(
 export function drawShareCard(
   canvas: HTMLCanvasElement,
   data: ShareCardData,
-  bgImage?: HTMLImageElement,
-  profileImg?: HTMLImageElement,
-): void {
+): Promise<void> {
+  return drawShareCardInternal(canvas, data);
+}
+
+async function drawShareCardInternal(
+  canvas: HTMLCanvasElement,
+  data: ShareCardData,
+) {
   const W = 1080;
-  const H = 1080;
-  canvas.width  = W;
+  const H = 560;
+  canvas.width = W;
   canvas.height = H;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const rand = seededRand(42);
+  const heroImage = await loadImage(HERO_IMAGE_PATH);
 
-  /* ══════════════════════════════════════════
-     LAYER 1 — Dark base
-  ══════════════════════════════════════════ */
-  ctx.fillStyle = "#06050e";
+  /* ── Background ── */
+  ctx.fillStyle = "#0b0f16";
+  ctx.fillRect(0, 0, W, H);
+  if (heroImage) {
+    drawCoverImage(ctx, heroImage, 0, 0, W, H);
+  }
+
+  const darkOverlay = ctx.createLinearGradient(0, 0, W, H);
+  darkOverlay.addColorStop(0, "rgba(8,10,14,0.78)");
+  darkOverlay.addColorStop(0.48, "rgba(8,10,14,0.52)");
+  darkOverlay.addColorStop(1, "rgba(8,10,14,0.86)");
+  ctx.fillStyle = darkOverlay;
   ctx.fillRect(0, 0, W, H);
 
-  /* ══════════════════════════════════════════
-     LAYER 2 — Full-bleed SpongeBob (cover fit)
-  ══════════════════════════════════════════ */
-  if (bgImage && bgImage.naturalWidth > 0) {
-    const iw = bgImage.naturalWidth;
-    const ih = bgImage.naturalHeight;
-    const scale = Math.max(W / iw, H / ih);   // cover: fill the whole card
-    const dw = iw * scale;
-    const dh = ih * scale;
-    const dx = (W - dw) / 2;
-    // Anchor slightly above center so the face/action stays visible
-    const dy = (H - dh) * 0.35;
-    ctx.drawImage(bgImage, dx, dy, dw, dh);
-  } else {
-    // Fallback vivid gradient
-    const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0,   "#1a0a3a");
-    grad.addColorStop(0.5, "#0d1a2a");
-    grad.addColorStop(1,   "#0a1f14");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
-  }
-
-  /* ══════════════════════════════════════════
-     LAYER 3 — Cinematic scrims (keep image visible in middle)
-  ══════════════════════════════════════════ */
-  // Top bar (logo strip) — deep dark
-  const topScrim = ctx.createLinearGradient(0, 0, 0, 200);
-  topScrim.addColorStop(0,   "rgba(4,3,10,0.92)");
-  topScrim.addColorStop(0.6, "rgba(4,3,10,0.55)");
-  topScrim.addColorStop(1,   "rgba(0,0,0,0)");
-  ctx.fillStyle = topScrim;
-  ctx.fillRect(0, 0, W, 200);
-
-  // Bottom panel — deep dark for text
-  const botScrim = ctx.createLinearGradient(0, H * 0.42, 0, H);
-  botScrim.addColorStop(0,    "rgba(0,0,0,0)");
-  botScrim.addColorStop(0.18, "rgba(4,3,10,0.72)");
-  botScrim.addColorStop(0.45, "rgba(4,3,10,0.91)");
-  botScrim.addColorStop(1,    "rgba(4,3,10,0.98)");
-  ctx.fillStyle = botScrim;
-  ctx.fillRect(0, H * 0.42, W, H * 0.58);
-
-  // Thin left + right edge vignettes
-  const vigL = ctx.createLinearGradient(0, 0, 80, 0);
-  vigL.addColorStop(0, "rgba(0,0,0,0.50)");
-  vigL.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = vigL;
-  ctx.fillRect(0, 0, 80, H);
-
-  const vigR = ctx.createLinearGradient(W - 80, 0, W, 0);
-  vigR.addColorStop(0, "rgba(0,0,0,0)");
-  vigR.addColorStop(1, "rgba(0,0,0,0.50)");
-  ctx.fillStyle = vigR;
-  ctx.fillRect(W - 80, 0, 80, H);
-
-  /* ══════════════════════════════════════════
-     LAYER 4 — Colour glows on top of image
-  ══════════════════════════════════════════ */
-  // Gold sweep from top-left
-  const glowGold = ctx.createRadialGradient(100, 100, 0, 100, 100, 700);
-  glowGold.addColorStop(0, "rgba(255,185,0,0.22)");
-  glowGold.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = glowGold;
+  /* ── Ambient glows ── */
+  const g1 = ctx.createRadialGradient(-40, -40, 0, -40, -40, 420);
+  g1.addColorStop(0, "rgba(255,113,64,0.22)");
+  g1.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g1;
   ctx.fillRect(0, 0, W, H);
 
-  // Green sweep from bottom-right
-  const glowGreen = ctx.createRadialGradient(W - 80, H - 80, 0, W - 80, H - 80, 550);
-  glowGreen.addColorStop(0, "rgba(20,241,149,0.16)");
-  glowGreen.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = glowGreen;
+  const g2 = ctx.createRadialGradient(W + 40, H + 40, 0, W + 40, H + 40, 380);
+  g2.addColorStop(0, "rgba(184,239,109,0.18)");
+  g2.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g2;
   ctx.fillRect(0, 0, W, H);
 
-  // Purple mid-right accent
-  const glowPurp = ctx.createRadialGradient(W, H * 0.5, 0, W, H * 0.5, 400);
-  glowPurp.addColorStop(0, "rgba(153,69,255,0.14)");
-  glowPurp.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = glowPurp;
+  const g3 = ctx.createRadialGradient(W * 0.55, H * 0.2, 0, W * 0.55, H * 0.2, 250);
+  g3.addColorStop(0, "rgba(35,211,255,0.12)");
+  g3.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g3;
   ctx.fillRect(0, 0, W, H);
 
-  /* ══════════════════════════════════════════
-     LAYER 5 — Diagonal shimmer lines
-  ══════════════════════════════════════════ */
+  /* ── Gradient border ── */
   ctx.save();
-  for (let i = 0; i < 12; i++) {
-    const lx = -400 + i * 180;
-    ctx.strokeStyle = `rgba(255,215,0,${0.01 + rand() * 0.03})`;
-    ctx.lineWidth = 1 + rand() * 2;
-    ctx.beginPath();
-    ctx.moveTo(lx, 0);
-    ctx.lineTo(lx + H * 0.9, H);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  /* ══════════════════════════════════════════
-     LAYER 6 — Floating sparkle dots
-  ══════════════════════════════════════════ */
-  const dots = [GOLD1, GOLD2, GREEN, PURPLE, TEAL, "#fff", "#FF6B6B"];
-  for (let i = 0; i < 50; i++) {
-    const bx = rand() * W;
-    const by = rand() * H;
-    const br = 1.2 + rand() * 3.5;
-    ctx.save();
-    ctx.globalAlpha = 0.07 + rand() * 0.22;
-    const dc = dots[Math.floor(rand() * dots.length)];
-    ctx.shadowColor = dc;
-    ctx.shadowBlur  = 6;
-    ctx.fillStyle   = dc;
-    ctx.beginPath();
-    ctx.arc(bx, by, br, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  /* ══════════════════════════════════════════
-     TOP LEFT — EpochRadar logo + tagline
-  ══════════════════════════════════════════ */
-  const lx = 52, ly = 60;
-
-  // Halo glow
-  ctx.save();
-  ctx.shadowColor = GOLD1;
-  ctx.shadowBlur  = 32;
-  ctx.fillStyle = "rgba(255,215,0,0.30)";
-  ctx.beginPath();
-  ctx.arc(lx, ly, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Rings
-  ctx.fillStyle = PURPLE;
-  ctx.beginPath(); ctx.arc(lx, ly, 9, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = GOLD1; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.arc(lx, ly, 14, 0, Math.PI * 2); ctx.stroke();
-  ctx.strokeStyle = GREEN; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(lx, ly, 20, 0, Math.PI * 2); ctx.stroke();
-
-  // Name
-  ctx.font = "800 28px ui-monospace,'SF Mono',monospace";
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "left";
-  ctx.shadowColor = "rgba(0,0,0,0.8)";
-  ctx.shadowBlur  = 10;
-  ctx.fillText("EpochRadar", 82, 54);
-  ctx.shadowBlur = 0;
-
-  // Tagline
-  ctx.font = "500 14px -apple-system,sans-serif";
-  ctx.fillStyle = GOLD2;
-  ctx.fillText("✦ Solana Airdrop Scanner", 83, 76);
-
-  /* ══════════════════════════════════════════
-     TOP RIGHT — Wallet chip
-  ══════════════════════════════════════════ */
-  const walletLabel = data.walletAddress
-    ? `${data.walletAddress.slice(0, 6)}…${data.walletAddress.slice(-4)}`
-    : "Demo Wallet";
-  ctx.font = "600 14px ui-monospace,monospace";
-  const chipW = ctx.measureText(walletLabel).width + 36;
-  const chipX = W - chipW - 40;
-  const chipY = 34;
-  roundRect(ctx, chipX, chipY, chipW, 36, 10);
-  ctx.fillStyle = "rgba(255,215,0,0.13)";
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,215,0,0.42)";
-  ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.fillStyle = GOLD3;
-  ctx.textAlign = "left";
-  ctx.fillText(walletLabel, chipX + 18, chipY + 24);
-
-  /* Profile pic */
-  if (profileImg) {
-    const pr = 26, px2 = chipX - pr - 14, py2 = chipY + 18;
-    ctx.save();
-    ctx.beginPath(); ctx.arc(px2, py2, pr, 0, Math.PI * 2); ctx.clip();
-    ctx.drawImage(profileImg, px2 - pr, py2 - pr, pr * 2, pr * 2);
-    ctx.restore();
-    ctx.save();
-    ctx.shadowColor = GOLD1; ctx.shadowBlur = 12;
-    ctx.strokeStyle = GOLD1; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(px2, py2, pr + 1, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-  }
-
-  /* ══════════════════════════════════════════
-     CENTRE — MASSIVE dollar value
-     Placed in the lower half so the SpongeBob
-     image is fully visible above it
-  ══════════════════════════════════════════ */
-  const valueStr = data.totalValue > 0
-    ? `$${data.totalValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : "$0.00";
-
-  const vy = 700; // vertical anchor for the big number
-
-  // Eyebrow
-  ctx.font = "700 15px -apple-system,sans-serif";
-  ctx.fillStyle = "rgba(255,215,0,0.70)";
-  ctx.textAlign = "center";
-  ctx.fillText("✦  YOUR ELIGIBLE AIRDROPS  ✦", W / 2, vy - 32);
-
-  // Soft glow behind number
-  ctx.save();
-  const vg = ctx.createRadialGradient(W / 2, vy, 0, W / 2, vy, 320);
-  vg.addColorStop(0, "rgba(255,200,0,0.30)");
-  vg.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, vy - 120, W, 200);
-  ctx.restore();
-
-  // Giant gradient number — 130px bold
-  ctx.save();
-  ctx.font = "900 130px -apple-system,BlinkMacSystemFont,sans-serif";
-  const tw = ctx.measureText(valueStr).width;
-  const tGrad = ctx.createLinearGradient(W / 2 - tw / 2, 0, W / 2 + tw / 2, 0);
-  tGrad.addColorStop(0,    GOLD3);
-  tGrad.addColorStop(0.25, GOLD1);
-  tGrad.addColorStop(0.55, GOLD2);
-  tGrad.addColorStop(0.80, GREEN);
-  tGrad.addColorStop(1,    TEAL);
-  ctx.fillStyle = tGrad;
-  ctx.textAlign = "center";
-  ctx.shadowColor = "rgba(255,200,0,0.65)";
-  ctx.shadowBlur  = 38;
-  ctx.fillText(valueStr, W / 2, vy);
-  ctx.restore();
-
-  // Subtitle under value
-  ctx.font = "400 22px -apple-system,sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.60)";
-  ctx.textAlign = "center";
-  ctx.shadowColor = "rgba(0,0,0,0.9)";
-  ctx.shadowBlur  = 8;
-  ctx.fillText("worth of Solana airdrops found  🪂", W / 2, vy + 48);
-  ctx.shadowBlur = 0;
-
-  /* ══════════════════════════════════════════
-     STATS PILLS — Eligible / Likely / Total
-  ══════════════════════════════════════════ */
-  const statsY = vy + 96;
-  const pills = [
-    { label: "ELIGIBLE",  val: data.eligibleCount,                     col: GOLD1,  bg: "rgba(255,215,0,0.14)",  border: "rgba(255,215,0,0.45)"  },
-    { label: "LIKELY",    val: data.likelyCount,                       col: GREEN,  bg: "rgba(20,241,149,0.12)", border: "rgba(20,241,149,0.40)" },
-    { label: "TOTAL",     val: data.eligibleCount + data.likelyCount,  col: PURPLE, bg: "rgba(153,69,255,0.12)", border: "rgba(153,69,255,0.40)" },
-  ];
-
-  const pW = 234, pH = 76, pGap = 16;
-  const totalW = pills.length * pW + (pills.length - 1) * pGap;
-  let px = (W - totalW) / 2;
-
-  for (const p of pills) {
-    roundRect(ctx, px, statsY, pW, pH, 16);
-    ctx.fillStyle = p.bg; ctx.fill();
-    ctx.strokeStyle = p.border; ctx.lineWidth = 1.5; ctx.stroke();
-
-    ctx.font = "700 13px -apple-system,sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
-    ctx.textAlign = "center";
-    ctx.fillText(p.label, px + pW / 2, statsY + 24);
-
-    ctx.save();
-    ctx.shadowColor = p.col; ctx.shadowBlur = 14;
-    ctx.font = "800 34px -apple-system,sans-serif";
-    ctx.fillStyle = p.col;
-    ctx.fillText(String(p.val), px + pW / 2, statsY + 62);
-    ctx.restore();
-
-    px += pW + pGap;
-  }
-
-  /* ══════════════════════════════════════════
-     AIRDROP CARDS — top 4
-  ══════════════════════════════════════════ */
-  const top = data.topAirdrops.slice(0, 4);
-  if (top.length > 0) {
-    const cardsY = statsY + pH + 20;
-    const margin = 36;
-    const cW = Math.floor((W - margin * 2 - (top.length - 1) * 10) / top.length);
-    const cH = 88;
-
-    ctx.font = "700 13px -apple-system,sans-serif";
-    ctx.fillStyle = "rgba(255,215,0,0.55)";
-    ctx.textAlign = "left";
-    ctx.fillText("✦  TOP AIRDROPS", margin, cardsY - 10);
-
-    top.forEach((item, i) => {
-      const cx = margin + i * (cW + 10);
-      const col = item.status === "Eligible" ? GOLD1 : item.status === "Likely" ? GREEN : TEAL;
-      const colBg  = col === GOLD1 ? "rgba(255,215,0,0.10)"  : col === GREEN ? "rgba(20,241,149,0.10)" : "rgba(0,194,255,0.10)";
-
-      roundRect(ctx, cx, cardsY, cW, cH, 12);
-      ctx.fillStyle = colBg; ctx.fill();
-      ctx.strokeStyle = col + "55"; ctx.lineWidth = 1.5; ctx.stroke();
-
-      // Icon
-      ctx.save();
-      ctx.shadowColor = col; ctx.shadowBlur = 14;
-      ctx.fillStyle = col + "20";
-      ctx.beginPath(); ctx.arc(cx + 22, cardsY + 25, 15, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-      ctx.strokeStyle = col + "88"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(cx + 22, cardsY + 25, 15, 0, Math.PI * 2); ctx.stroke();
-      ctx.font = "800 11px -apple-system,sans-serif";
-      ctx.fillStyle = col; ctx.textAlign = "center";
-      ctx.fillText(item.project.slice(0, 2).toUpperCase(), cx + 22, cardsY + 29);
-
-      const nm = item.project.length > 11 ? item.project.slice(0, 10) + "…" : item.project;
-      ctx.font = "700 13px -apple-system,sans-serif";
-      ctx.fillStyle = "#fff"; ctx.textAlign = "left";
-      ctx.fillText(nm, cx + 8, cardsY + 56);
-
-      ctx.font = "700 13px -apple-system,sans-serif";
-      ctx.fillStyle = col;
-      ctx.fillText(item.estimatedValue ?? "TBD", cx + 8, cardsY + 74);
-
-      // Bottom glow bar
-      const bG = ctx.createLinearGradient(cx, 0, cx + cW, 0);
-      bG.addColorStop(0,   col + "00");
-      bG.addColorStop(0.5, col + "aa");
-      bG.addColorStop(1,   col + "00");
-      ctx.fillStyle = bG;
-      ctx.fillRect(cx, cardsY + cH - 3, cW, 3);
-    });
-  }
-
-  /* ══════════════════════════════════════════
-     OUTER BORDER — gold glow
-  ══════════════════════════════════════════ */
-  ctx.save();
-  ctx.shadowColor = GOLD1; ctx.shadowBlur = 24;
-  const border = ctx.createLinearGradient(0, 0, W, H);
-  border.addColorStop(0,    GOLD1 + "ee");
-  border.addColorStop(0.35, PURPLE + "88");
-  border.addColorStop(0.70, TEAL + "66");
-  border.addColorStop(1,    GREEN + "cc");
-  ctx.strokeStyle = border; ctx.lineWidth = 3.5;
-  roundRect(ctx, 1.5, 1.5, W - 3, H - 3, 24);
+  const borderGrad = ctx.createLinearGradient(0, 0, W, H);
+  borderGrad.addColorStop(0, "rgba(255,196,109,0.44)");
+  borderGrad.addColorStop(0.5, "rgba(35,211,255,0.28)");
+  borderGrad.addColorStop(1, "rgba(184,239,109,0.4)");
+  ctx.strokeStyle = borderGrad;
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, 1, 1, W - 2, H - 2, 20);
   ctx.stroke();
   ctx.restore();
 
-  /* Watermark */
-  ctx.font = "600 14px ui-monospace,monospace";
-  ctx.fillStyle = "rgba(255,215,0,0.32)";
+  /* ── Top bar ── */
+  ctx.fillStyle = "rgba(255,255,255,0.03)";
+  roundRect(ctx, 22, 20, W - 44, 62, 12);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  /* Solana logo mark — two colored circles */
+  const dotX = 52, dotY = 51;
+  // Amber circle
+  ctx.fillStyle = SOL_AMBER;
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
+  ctx.fill();
+  // Neon ring
+  ctx.strokeStyle = SOL_NEON;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, 10, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // "EpochRadar"
+  ctx.font = "700 19px ui-monospace, 'SF Mono', Menlo, monospace";
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
+  ctx.fillText("EpochRadar", 76, 57);
+
+  // Powered by Solana badge
+  const badgeText = "Powered by Solana";
+  ctx.font = "500 12px -apple-system, sans-serif";
+  const bw = ctx.measureText(badgeText).width + 20;
+  roundRect(ctx, 96, 60, bw, 18, 5);
+  ctx.fillStyle = `${SOL_AMBER}2A`;
+  ctx.fill();
+  ctx.fillStyle = SOL_AMBER;
+  ctx.textAlign = "left";
+  ctx.fillText(badgeText, 106, 74);
+
+  // Wallet address
+  const walletLabel = data.walletAddress
+    ? `${data.walletAddress.slice(0, 6)}...${data.walletAddress.slice(-4)}`
+    : "Demo wallet";
+  ctx.font = "500 13px ui-monospace, 'SF Mono', Menlo, monospace";
+  const ww = ctx.measureText(walletLabel).width + 24;
+  roundRect(ctx, W - 24 - ww - 4, 34, ww, 34, 9);
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = "#666";
   ctx.textAlign = "center";
-  ctx.fillText("epochradar.com  ✦  Solana Airdrop Checker", W / 2, H - 18);
+  ctx.fillText(walletLabel, W - 24 - ww / 2 - 4, 56);
+
+  /* ── Main headline ── */
+  ctx.textAlign = "left";
+  ctx.font = "400 13px -apple-system, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.fillText("Total airdrop value found", 44, 136);
+
+  ctx.font = "700 72px -apple-system, sans-serif";
+  const totalStr = `$${data.totalValue.toFixed(2)}`;
+  const headGrad = ctx.createLinearGradient(44, 142, 44 + ctx.measureText(totalStr).width, 220);
+  headGrad.addColorStop(0, SOL_AMBER);
+  headGrad.addColorStop(0.5, SOL_NEON);
+  headGrad.addColorStop(1, SOL_LIME);
+  ctx.fillStyle = headGrad;
+  ctx.fillText(totalStr, 44, 224);
+
+  /* ── Stats pills ── */
+  const stats = [
+    { label: "Eligible",  value: String(data.eligibleCount),                         color: SOL_LIME,  bg: "rgba(184,239,109,0.10)",  border: "rgba(184,239,109,0.3)"  },
+    { label: "Likely",    value: String(data.likelyCount),                            color: SOL_NEON,  bg: "rgba(35,211,255,0.10)",   border: "rgba(35,211,255,0.3)"   },
+    { label: "Airdrops",  value: String(data.eligibleCount + data.likelyCount),       color: SOL_AMBER, bg: "rgba(255,196,109,0.10)",  border: "rgba(255,196,109,0.32)"  },
+  ];
+
+  let px = 44;
+  for (const stat of stats) {
+    ctx.font = "600 11px -apple-system, sans-serif";
+    const lw = ctx.measureText(stat.label).width;
+    ctx.font = "700 16px -apple-system, sans-serif";
+    const vw = ctx.measureText(stat.value).width;
+    const pillW = Math.max(lw, vw) + 36;
+    const pillH = 52;
+    const py = 246;
+
+    roundRect(ctx, px, py, pillW, pillH, 10);
+    ctx.fillStyle = stat.bg;
+    ctx.fill();
+    ctx.strokeStyle = stat.border;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.font = "500 10.5px -apple-system, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.textAlign = "center";
+    ctx.fillText(stat.label, px + pillW / 2, py + 17);
+
+    ctx.font = "700 18px -apple-system, sans-serif";
+    ctx.fillStyle = stat.color;
+    ctx.fillText(stat.value, px + pillW / 2, py + 40);
+
+    px += pillW + 10;
+  }
+
+  /* ── Divider ── */
+  const divGrad = ctx.createLinearGradient(34, 0, W - 34, 0);
+  divGrad.addColorStop(0, "rgba(255,196,109,0.3)");
+  divGrad.addColorStop(0.5, "rgba(35,211,255,0.2)");
+  divGrad.addColorStop(1, "rgba(184,239,109,0.3)");
+  ctx.strokeStyle = divGrad;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(44, 326);
+  ctx.lineTo(W - 44, 326);
+  ctx.stroke();
+
+  /* ── Top airdrops ── */
+  ctx.font = "600 11px -apple-system, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.textAlign = "left";
+  ctx.fillText("TOP AIRDROPS", 44, 352);
+
+  const topItems = data.topAirdrops.slice(0, 4);
+  const colW = (W - 88) / Math.max(topItems.length, 1);
+
+  topItems.forEach((item, i) => {
+    const ix = 44 + i * colW;
+    const iy = 368;
+    const iw = colW - 10;
+    const ih = 94;
+
+    roundRect(ctx, ix, iy, iw, ih, 10);
+    ctx.fillStyle = "rgba(255,255,255,0.03)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Logo circle with Solana gradient
+    const logoGrad = ctx.createLinearGradient(ix + 8, iy + 8, ix + 36, iy + 36);
+    logoGrad.addColorStop(0, SOL_AMBER);
+    logoGrad.addColorStop(1, SOL_NEON);
+    ctx.fillStyle = `rgba(255,196,109,0.14)`;
+    ctx.beginPath();
+    ctx.arc(ix + 22, iy + 24, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = logoGrad;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.font = "700 10px -apple-system, sans-serif";
+    ctx.fillStyle = SOL_LIME;
+    ctx.textAlign = "center";
+    ctx.fillText(item.project.slice(0, 2).toUpperCase(), ix + 22, iy + 28);
+
+    // Project name
+    ctx.font = "600 12px -apple-system, sans-serif";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "left";
+    const name = item.project.length > 13 ? item.project.slice(0, 12) + "…" : item.project;
+    ctx.fillText(name, ix + 40, iy + 20);
+
+    // Est value
+    const valColor = item.status === "Eligible" ? SOL_LIME : item.status === "Likely" ? SOL_NEON : SOL_AMBER;
+    ctx.font = "500 11px -apple-system, sans-serif";
+    ctx.fillStyle = valColor;
+    ctx.fillText(item.estimatedValue ?? "TBD", ix + 40, iy + 36);
+
+    // Status badge
+    ctx.font = "600 10px -apple-system, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.fillText(item.status, ix + 12, iy + 76);
+  });
+
+  /* ── Bottom watermark ── */
+  ctx.font = "500 11px ui-monospace, 'SF Mono', Menlo, monospace";
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.textAlign = "center";
+  ctx.fillText("epochradar.com  ·  Solana Airdrop Checker", W / 2, H - 18);
+}
+
+function drawCoverImage(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const scale = Math.max(width / img.width, height / img.height);
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  const dx = x + (width - dw) / 2;
+  const dy = y + (height - dh) / 2;
+  ctx.drawImage(img, dx, dy, dw, dh);
+}
+
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
 }
