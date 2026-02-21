@@ -20,7 +20,6 @@ export type ShareCardData = {
   totalValue: number;
   topAirdrops: Array<{ project: string; status: string; estimatedValue?: string }>;
   solPrice?: number;
-  profilePic?: string;
 };
 
 /* ─── palette ──────────────────────────────────── */
@@ -66,12 +65,17 @@ function drawNoise(ctx: CanvasRenderingContext2D, W: number, H: number, alpha: n
 export function drawShareCard(
   canvas: HTMLCanvasElement,
   data: ShareCardData,
-  bgImage?: HTMLImageElement,
-  profileImg?: HTMLImageElement,
-): void {
+): Promise<void> {
+  return drawShareCardInternal(canvas, data);
+}
+
+async function drawShareCardInternal(
+  canvas: HTMLCanvasElement,
+  data: ShareCardData,
+) {
   const W = 1080;
-  const H = 1080;
-  canvas.width  = W;
+  const H = 560;
+  canvas.width = W;
   canvas.height = H;
 
   const ctx = canvas.getContext("2d");

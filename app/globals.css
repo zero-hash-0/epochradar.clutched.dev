@@ -1089,6 +1089,10 @@ a:hover {
 
 /* ── Responsive ── */
 @media (max-width: 840px) {
+  .page {
+    padding: 18px 12px 56px;
+  }
+
   .board-top {
     grid-template-columns: 1fr;
   }
@@ -1099,7 +1103,7 @@ a:hover {
   }
 
   .board-table {
-    min-width: 640px;
+    min-width: 560px;
   }
 
   .board-table-wrap {
@@ -1434,12 +1438,12 @@ a:hover {
   border-radius: 24px;
   padding: 24px;
   width: 100%;
-  max-width: 520px;
+  max-width: min(920px, 96vw);
   display: flex;
   flex-direction: column;
   gap: 18px;
-  animation: slideUp 200ms ease;
-  box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,215,0,0.08);
+  animation: slideUp 260ms ease;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(20,241,149,0.06);
 }
 
 @keyframes slideUp {
@@ -1486,11 +1490,11 @@ a:hover {
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(255, 203, 126, 0.2);
-  min-height: 132px;
+  min-height: 180px;
   background:
-    linear-gradient(105deg, rgba(11, 13, 18, 0.72) 0%, rgba(11, 13, 18, 0.45) 48%, rgba(11, 13, 18, 0.8) 100%),
-    radial-gradient(220px 170px at 82% 40%, rgba(188, 33, 38, 0.22) 0%, transparent 65%),
-    linear-gradient(130deg, #36302b 0%, #221d1a 35%, #12141b 100%);
+    linear-gradient(105deg, rgba(11, 13, 18, 0.74) 0%, rgba(11, 13, 18, 0.42) 48%, rgba(11, 13, 18, 0.82) 100%),
+    radial-gradient(260px 180px at 84% 40%, rgba(188, 33, 38, 0.2) 0%, transparent 65%),
+    url("/share-bg.jpg") center center / cover no-repeat;
 }
 
 .share-scene::before {
@@ -1505,6 +1509,7 @@ a:hover {
     );
   mix-blend-mode: screen;
   opacity: 0.35;
+  animation: scenePan 11s ease-in-out infinite alternate;
 }
 
 .share-scene-overlay {
@@ -1517,10 +1522,10 @@ a:hover {
 .share-scene-content {
   position: relative;
   z-index: 1;
-  padding: 14px 16px;
+  padding: 18px 20px;
   display: grid;
   gap: 7px;
-  max-width: 78%;
+  max-width: 72%;
 }
 
 .share-scene-kicker {
@@ -1535,7 +1540,7 @@ a:hover {
 .share-scene h3 {
   margin: 0;
   color: #f9f4eb;
-  font-size: 20px;
+  font-size: 24px;
   line-height: 1.04;
 }
 
@@ -1569,19 +1574,19 @@ a:hover {
 
 /* Canvas preview */
 .share-canvas-wrap {
-  border-radius: 16px;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1.5px solid rgba(255,215,0,0.25);
-  background: #0d0d0d;
+  border: 1px solid rgba(255, 195, 120, 0.2);
+  background: #0a0d11;
   line-height: 0;
-  box-shadow: 0 0 24px rgba(255,215,0,0.12), 0 8px 32px rgba(0,0,0,0.5);
+  animation: cardFloat 4.8s ease-in-out infinite;
 }
 
 .share-canvas {
   width: 100%;
   height: auto;
   display: block;
-  border-radius: 15px;
+  border-radius: 14px;
 }
 
 /* Action buttons row */
@@ -1603,7 +1608,7 @@ a:hover {
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 140ms ease, transform 120ms ease;
+  transition: opacity 140ms ease, transform 120ms ease, box-shadow 180ms ease;
   flex: 1;
   justify-content: center;
   min-width: 120px;
@@ -1614,12 +1619,14 @@ a:hover {
 .share-copy-btn:hover {
   opacity: 0.86;
   transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
 .share-dl-btn {
   background: linear-gradient(132deg, #ffbe6f 0%, #ffe79f 100%);
   color: #231406;
   border: none;
+  animation: pulseGlow 2.4s ease-in-out infinite;
 }
 
 .share-x-btn {
@@ -1665,15 +1672,15 @@ a:hover {
 @media (max-width: 680px) {
   .modal-backdrop {
     padding: 10px;
-    align-items: flex-end;
+    align-items: center;
   }
 
   .share-modal-card {
-    width: 100%;
-    max-width: 100%;
-    max-height: 86dvh;
+    width: min(100%, 96vw);
+    max-width: 96vw;
+    max-height: min(92dvh, 820px);
     border-radius: 18px;
-    padding: 14px;
+    padding: 12px;
     gap: 12px;
     overflow: auto;
   }
@@ -1694,16 +1701,16 @@ a:hover {
 
   .share-canvas-wrap {
     border-radius: 12px;
-    aspect-ratio: 800 / 440;
+    aspect-ratio: 1080 / 560;
   }
 
   .share-scene-content {
     max-width: 100%;
-    padding: 13px;
+    padding: 12px;
   }
 
   .share-scene h3 {
-    font-size: 17px;
+    font-size: 18px;
   }
 
   .share-canvas {
@@ -1731,6 +1738,22 @@ a:hover {
     font-size: 11px;
     padding: 10px;
   }
+}
+
+@keyframes scenePan {
+  0% { transform: translateX(-2%) scale(1.02); }
+  100% { transform: translateX(2%) scale(1.06); }
+}
+
+@keyframes cardFloat {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 190, 111, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 190, 111, 0.16); }
 }
 
 /* legacy share-options (kept for fallback) */
