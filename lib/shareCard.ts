@@ -2,12 +2,14 @@
  * EpochRadar Share Card — Pro Edition
  *
  * Layout (1080 × 1080 square):
- *   • Full-bleed background image (SpongeBob / custom art), cover-fit
- *   • Gradient scrims: heavy at top + bottom, clear window in the middle third
- *   • Top strip  : logo left | wallet chip right
- *   • Middle     : image shows through — pure art zone
- *   • Lower half : headline value, subtitle, divider, 3 stat chips, airdrop list
- *   • Bottom     : watermark
+ *   • TOP HALF  : full-bleed art (cover-fit), top scrim for logo strip
+ *   • BOTTOM HALF: solid dark panel — clean, no art bleed
+ *     - Eyebrow, dollar value, subtitle
+ *     - Hairline divider
+ *     - 3 stat chips (Eligible / Likely / Total)
+ *     - Hairline divider
+ *     - Up to 5 airdrop rows (compact list)
+ *     - Watermark
  *
  * Design language: premium fintech card — tight grid, monospace accents,
  * muted glass panels, strong typographic hierarchy. Gold/green/purple brand palette.
@@ -97,100 +99,101 @@ async function drawShareCardInternal(
   const bgImage = await loadImage(`/spongebob.jpg?v=${Date.now()}`);
   const profileImg = data.profilePic ? await loadImage(data.profilePic) : null;
 
+  /* ─── Key layout constants ─── */
+  const SPLIT   = Math.round(H * 0.46);  // y where art ends, dark panel begins
+  const PAD     = 52;
+
   /* ══════════════════════════════════════════════════════
-     STEP 1 — Dark base
+     STEP 1 — Full canvas dark base
   ══════════════════════════════════════════════════════ */
   ctx.fillStyle = "#06050d";
   ctx.fillRect(0, 0, W, H);
 
   /* ══════════════════════════════════════════════════════
-     STEP 2 — Full-bleed background art, cover-fit
+     STEP 2 — TOP HALF: art, clipped to [0 → SPLIT]
   ══════════════════════════════════════════════════════ */
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, SPLIT);
+  ctx.clip();
+
   if (bgImage && bgImage.naturalWidth > 0) {
     const iw = bgImage.naturalWidth;
     const ih = bgImage.naturalHeight;
-    // cover: whichever axis overflows, crop it centered
-    const scale = Math.max(W / iw, H / ih);
+    // Cover-fit into the full width × SPLIT height
+    const scale = Math.max(W / iw, SPLIT / ih);
     const dw = iw * scale;
     const dh = ih * scale;
     const dx = (W - dw) / 2;
-    // Push slightly up so subject appears in upper-centre, text lands below
-    const dy = (H - dh) * 0.28;
+    const dy = (SPLIT - dh) / 2;   // vertically centre in the art zone
     ctx.drawImage(bgImage, dx, dy, dw, dh);
   } else {
     // Vivid fallback gradient
-    const g = ctx.createLinearGradient(0, 0, W, H);
+    const g = ctx.createLinearGradient(0, 0, W, SPLIT);
     g.addColorStop(0,   "#14003a");
     g.addColorStop(0.5, "#001a30");
     g.addColorStop(1,   "#001a10");
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, W, SPLIT);
   }
 
-  /* ══════════════════════════════════════════════════════
-     STEP 3 — Cinematic scrims
-     Top 220px  : opaque → clear  (logo strip)
-     Bottom 55% : clear → opaque  (data panel)
-     Sides      : thin edge vignette
-  ══════════════════════════════════════════════════════ */
-  const sTop = ctx.createLinearGradient(0, 0, 0, 220);
-  sTop.addColorStop(0,   "rgba(4,3,11,0.96)");
-  sTop.addColorStop(0.7, "rgba(4,3,11,0.50)");
+  // Top logo scrim: opaque at very top → clear by 200px
+  const sTop = ctx.createLinearGradient(0, 0, 0, 200);
+  sTop.addColorStop(0,   "rgba(4,3,11,0.93)");
+  sTop.addColorStop(0.6, "rgba(4,3,11,0.30)");
   sTop.addColorStop(1,   "rgba(4,3,11,0)");
   ctx.fillStyle = sTop;
-  ctx.fillRect(0, 0, W, 220);
+  ctx.fillRect(0, 0, W, 200);
 
-  const sBot = ctx.createLinearGradient(0, H * 0.38, 0, H);
-  sBot.addColorStop(0,    "rgba(4,3,11,0)");
-  sBot.addColorStop(0.15, "rgba(4,3,11,0.65)");
-  sBot.addColorStop(0.38, "rgba(4,3,11,0.90)");
-  sBot.addColorStop(1,    "rgba(4,3,11,0.98)");
-  ctx.fillStyle = sBot;
-  ctx.fillRect(0, H * 0.38, W, H * 0.62);
-
-  const sL = ctx.createLinearGradient(0, 0, 60, 0);
+  // Side vignettes on the art zone
+  const sL = ctx.createLinearGradient(0, 0, 50, 0);
   sL.addColorStop(0, "rgba(0,0,0,0.55)");
   sL.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = sL; ctx.fillRect(0, 0, 60, H);
+  ctx.fillStyle = sL; ctx.fillRect(0, 0, 50, SPLIT);
 
-  const sR = ctx.createLinearGradient(W - 60, 0, W, 0);
+  const sR = ctx.createLinearGradient(W - 50, 0, W, 0);
   sR.addColorStop(0, "rgba(0,0,0,0)");
   sR.addColorStop(1, "rgba(0,0,0,0.55)");
-  ctx.fillStyle = sR; ctx.fillRect(W - 60, 0, 60, H);
+  ctx.fillStyle = sR; ctx.fillRect(W - 50, 0, 50, SPLIT);
+
+  ctx.restore(); // end art clip
 
   /* ══════════════════════════════════════════════════════
-     STEP 4 — Subtle colour ambient glows (low opacity)
+     STEP 3 — BOTTOM HALF: solid dark panel [SPLIT → H]
+     Hard edge at SPLIT, completely opaque — no art bleed.
   ══════════════════════════════════════════════════════ */
-  // Gold burst top-left (brand warmth)
-  const gA = ctx.createRadialGradient(0, 0, 0, 0, 0, 650);
-  gA.addColorStop(0, "rgba(255,190,0,0.18)");
-  gA.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = gA; ctx.fillRect(0, 0, W, H);
+  // Base fill
+  ctx.fillStyle = "#07060f";
+  ctx.fillRect(0, SPLIT, W, H - SPLIT);
 
-  // Green bloom bottom-right
-  const gB = ctx.createRadialGradient(W, H, 0, W, H, 520);
-  gB.addColorStop(0, "rgba(20,241,149,0.13)");
+  // Subtle top-edge glow on the panel (brand colours bleeding down from art)
+  const panelTopGlow = ctx.createLinearGradient(0, SPLIT, 0, SPLIT + 80);
+  panelTopGlow.addColorStop(0, "rgba(255,215,0,0.10)");
+  panelTopGlow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = panelTopGlow;
+  ctx.fillRect(0, SPLIT, W, 80);
+
+  // Ambient colour glows inside the panel only
+  const gB = ctx.createRadialGradient(W * 0.15, H, 0, W * 0.15, H, 420);
+  gB.addColorStop(0, "rgba(20,241,149,0.10)");
   gB.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = gB; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = gB; ctx.fillRect(0, SPLIT, W, H - SPLIT);
 
-  // Purple centre-right
-  const gC = ctx.createRadialGradient(W * 0.85, H * 0.5, 0, W * 0.85, H * 0.5, 380);
-  gC.addColorStop(0, "rgba(153,69,255,0.11)");
+  const gC = ctx.createRadialGradient(W * 0.85, H * 0.85, 0, W * 0.85, H * 0.85, 380);
+  gC.addColorStop(0, "rgba(153,69,255,0.09)");
   gC.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = gC; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = gC; ctx.fillRect(0, SPLIT, W, H - SPLIT);
 
   /* ══════════════════════════════════════════════════════
-     STEP 5 — Subtle noise texture (adds depth / pro feel)
+     STEP 4 — Noise texture (panel only, subtle)
   ══════════════════════════════════════════════════════ */
-  drawNoise(ctx, W, H, 0.025);
+  drawNoise(ctx, W, H, 0.018);
 
   /* ══════════════════════════════════════════════════════
      STEP 6 — TOP STRIP
      Left : logo mark + wordmark + tagline
      Right: wallet chip (+ profile pic if present)
   ══════════════════════════════════════════════════════ */
-  const PAD = 52;
-
   // ── Logo mark (concentric circles, Solana-ish) ──
   const lx = PAD + 18, ly = 60;
 
@@ -254,7 +257,7 @@ async function drawShareCardInternal(
   }
 
   /* ══════════════════════════════════════════════════════
-     STEP 7 — MAIN DATA PANEL (lower ~52% of card)
+     STEP 7 — MAIN DATA PANEL (SPLIT → H)
 
      Layout inside panel (top → bottom):
        Eyebrow label
@@ -263,11 +266,11 @@ async function drawShareCardInternal(
        ── Hairline divider ──
        3 stat chips in a row
        ── Hairline divider ──
-       Up to 4 airdrop rows (compact list style)
+       Up to 5 airdrop rows (compact list style)
        Watermark
   ══════════════════════════════════════════════════════ */
-  const panelTop = H * 0.49;    // where data starts
-  const valueY   = panelTop + 130;
+  const panelTop = SPLIT;       // data starts right at the split
+  const valueY   = panelTop + 118;
 
   // ── Eyebrow ──
   ctx.font = "700 14px -apple-system,sans-serif";
@@ -367,11 +370,11 @@ async function drawShareCardInternal(
   /* ── Airdrop list (up to 4 rows) ──
      Each row: colour dot | project name     | status pill | est. value
   */
-  const top4 = data.topAirdrops.slice(0, 4);
+  const top4 = data.topAirdrops.slice(0, 5);
   if (top4.length > 0) {
     const listY  = div2Y + 16;
-    const rowH   = 44;
-    const rowGap = 8;
+    const rowH   = 42;
+    const rowGap = 7;
 
     // Section label
     ctx.font = "600 11px -apple-system,sans-serif";
@@ -425,7 +428,24 @@ async function drawShareCardInternal(
   }
 
   /* ══════════════════════════════════════════════════════
-     STEP 8 — Outer border (gradient glow)
+     STEP 8 — Dividing line between art and data panel
+  ══════════════════════════════════════════════════════ */
+  // Thin accent line at the split point
+  const splitLineG = ctx.createLinearGradient(0, 0, W, 0);
+  splitLineG.addColorStop(0,    "rgba(255,215,0,0)");
+  splitLineG.addColorStop(0.15, "rgba(255,215,0,0.55)");
+  splitLineG.addColorStop(0.5,  "rgba(20,241,149,0.40)");
+  splitLineG.addColorStop(0.85, "rgba(153,69,255,0.35)");
+  splitLineG.addColorStop(1,    "rgba(153,69,255,0)");
+  ctx.strokeStyle = splitLineG;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, SPLIT);
+  ctx.lineTo(W, SPLIT);
+  ctx.stroke();
+
+  /* ══════════════════════════════════════════════════════
+     STEP 9 — Outer border (gradient glow)
   ══════════════════════════════════════════════════════ */
   ctx.save();
   ctx.shadowColor = GOLD;
@@ -442,7 +462,7 @@ async function drawShareCardInternal(
   ctx.restore();
 
   /* ══════════════════════════════════════════════════════
-     STEP 9 — Watermark
+     STEP 10 — Watermark
   ══════════════════════════════════════════════════════ */
   ctx.font = "500 13px ui-monospace,monospace";
   ctx.fillStyle = "rgba(255,215,0,0.28)";
