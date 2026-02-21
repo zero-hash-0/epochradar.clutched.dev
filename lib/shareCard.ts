@@ -20,6 +20,7 @@ export type ShareCardData = {
   totalValue: number;
   topAirdrops: Array<{ project: string; status: string; estimatedValue?: string }>;
   solPrice?: number;
+  profilePic?: string;
 };
 
 /* ─── palette ──────────────────────────────────── */
@@ -69,17 +70,32 @@ export function drawShareCard(
   return drawShareCardInternal(canvas, data);
 }
 
+/* Load an image from a URL, resolve with the HTMLImageElement (or null on error) */
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
 async function drawShareCardInternal(
   canvas: HTMLCanvasElement,
   data: ShareCardData,
 ) {
   const W = 1080;
-  const H = 560;
+  const H = 1080;
   canvas.width = W;
   canvas.height = H;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+
+  /* Load background and profile images asynchronously */
+  const bgImage = await loadImage(`/spongebob.jpg?v=${Date.now()}`);
+  const profileImg = data.profilePic ? await loadImage(data.profilePic) : null;
 
   /* ══════════════════════════════════════════════════════
      STEP 1 — Dark base
