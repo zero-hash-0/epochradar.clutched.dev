@@ -380,10 +380,8 @@ export default function AirdropCheckerClient() {
               </div>
             </section>
 
-            {/* Canvas preview */}
-            <div className="share-canvas-wrap">
-              <canvas ref={shareCanvasRef} className="share-canvas" />
-            </div>
+            {/* Hidden render surface used for "Save image" export */}
+            <canvas ref={shareCanvasRef} className="share-canvas-hidden" aria-hidden="true" />
 
             {/* Actions */}
             <div className="share-modal-actions">

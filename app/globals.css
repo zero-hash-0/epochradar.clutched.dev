@@ -1589,6 +1589,14 @@ a:hover {
   border-radius: 14px;
 }
 
+.share-canvas-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Action buttons row */
 .share-modal-actions {
   display: flex;
