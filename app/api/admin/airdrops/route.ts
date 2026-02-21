@@ -6,6 +6,12 @@ import { isPlainObject, isValidHttpsUrl } from "@/lib/security";
 const ALLOWED_CATEGORIES = new Set(["defi", "nft", "infrastructure", "consumer"]);
 const ALLOWED_STATUSES = new Set(["upcoming", "active", "snapshot_taken", "ended"]);
 const ALLOWED_RISK_LEVELS = new Set(["low", "medium", "high"]);
+const ALLOWED_VERIFICATION_METHODS = new Set([
+  "claim_api",
+  "distributor_program",
+  "manual_verified",
+  "unverified",
+]);
 const ID_PATTERN = /^[a-z0-9][a-z0-9-_]{2,63}$/;
 
 export async function GET() {
@@ -67,6 +73,17 @@ export async function POST(req: NextRequest) {
   const sourceUrl = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : "";
   const riskLevel = typeof body.riskLevel === "string" ? body.riskLevel.trim().toLowerCase() : "medium";
   const checks = body.checks;
+  const verificationMethod =
+    typeof body.verificationMethod === "string" ? body.verificationMethod.trim().toLowerCase() : "unverified";
+  const distributorProgramId =
+    typeof body.distributorProgramId === "string" ? body.distributorProgramId.trim() : "";
+  const claimApiEndpoint =
+    typeof body.claimApiEndpoint === "string" ? body.claimApiEndpoint.trim() : "";
+  const snapshotProofType =
+    typeof body.snapshotProofType === "string" ? body.snapshotProofType.trim() : "";
+  const sourceConfidence =
+    typeof body.sourceConfidence === "number" ? body.sourceConfidence : 0.5;
+  const verificationConfig = isPlainObject(body.verificationConfig) ? body.verificationConfig : {};
 
   if (!id || !project || !officialClaimUrl || !sourceUrl) {
     return NextResponse.json(
@@ -98,8 +115,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid riskLevel value" }, { status: 400 });
   }
 
+  if (!ALLOWED_VERIFICATION_METHODS.has(verificationMethod)) {
+    return NextResponse.json({ error: "Invalid verificationMethod value" }, { status: 400 });
+  }
+
   if (!isValidHttpsUrl(officialClaimUrl) || !isValidHttpsUrl(sourceUrl)) {
     return NextResponse.json({ error: "officialClaimUrl and sourceUrl must be valid HTTPS URLs" }, { status: 400 });
+  }
+
+  if (claimApiEndpoint && !isValidHttpsUrl(claimApiEndpoint)) {
+    return NextResponse.json({ error: "claimApiEndpoint must be a valid HTTPS URL" }, { status: 400 });
+  }
+
+  if (sourceConfidence < 0 || sourceConfidence > 1) {
+    return NextResponse.json({ error: "sourceConfidence must be between 0 and 1" }, { status: 400 });
   }
 
   if (checks !== undefined && !isPlainObject(checks)) {
@@ -121,6 +150,13 @@ export async function POST(req: NextRequest) {
       status,
       official_claim_url: officialClaimUrl,
       source_url: sourceUrl,
+      verification_method: verificationMethod,
+      distributor_program_id: distributorProgramId || null,
+      claim_api_endpoint: claimApiEndpoint || null,
+      snapshot_proof_type: snapshotProofType || null,
+      last_verified_at: new Date().toISOString(),
+      source_confidence: sourceConfidence,
+      verification_config: verificationConfig,
       risk_level: riskLevel,
       checks: checks || {},
       is_active: true,

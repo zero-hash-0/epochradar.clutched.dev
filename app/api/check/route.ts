@@ -3,6 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import { buildWalletProfile } from "@/lib/solanaProfile";
 import { evaluateWalletAirdrops } from "@/lib/evaluator";
 import { getAirdropRules } from "@/lib/dbAirdrops";
+import { scanPastAirdrops } from "@/lib/pastAirdrops";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,17 +26,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [profile, rules] = await Promise.all([
+    const [profile, rules, pastAirdrops] = await Promise.all([
       buildWalletProfile(walletAddress),
       getAirdropRules(),
+      scanPastAirdrops(walletAddress, 80),
     ]);
-    const results = evaluateWalletAirdrops(profile, rules);
+    const results = await evaluateWalletAirdrops(walletAddress, rules);
+    const activeAirdrops = results.filter((item) => item.airdropStatus === "active" || item.airdropStatus === "snapshot_taken");
+    const upcomingAirdrops = results.filter((item) => item.airdropStatus === "upcoming");
+    const endedAirdrops = results.filter((item) => item.airdropStatus === "ended");
+    const verifiedUsdTotal = results.reduce((sum, item) => sum + (item.verifiedUsdTotal || 0), 0);
 
     return NextResponse.json(
       {
         checkedAt: new Date().toISOString(),
         profile,
         results,
+        activeAirdrops,
+        upcomingAirdrops,
+        endedAirdrops,
+        pastAirdrops,
+        totals: {
+          verifiedUsdTotal,
+          eligibleCount: activeAirdrops.filter((item) => item.status === "eligible").length,
+          unknownCount: results.filter((item) => item.status === "unknown").length,
+        },
         safety: {
           readOnly: true,
           privateKeysRequested: false,

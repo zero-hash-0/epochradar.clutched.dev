@@ -9,6 +9,13 @@ export type DbAirdropRow = {
   official_claim_url: string;
   source_url: string;
   trusted_domains?: string[] | null;
+  verification_method?: "claim_api" | "distributor_program" | "manual_verified" | "unverified" | null;
+  distributor_program_id?: string | null;
+  claim_api_endpoint?: string | null;
+  snapshot_proof_type?: string | null;
+  last_verified_at?: string | null;
+  source_confidence?: number | null;
+  verification_config?: Record<string, unknown> | null;
   timeline?: {
     announcedAt?: string;
     snapshotAt?: string;

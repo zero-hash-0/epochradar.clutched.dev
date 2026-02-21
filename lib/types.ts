@@ -1,4 +1,11 @@
 export type EligibilityStatus = "eligible" | "likely" | "not_eligible" | "unknown";
+export type ProviderEligibilityStatus = "eligible" | "not_eligible" | "unknown";
+export type AirdropLifecycleStatus = "upcoming" | "active" | "snapshot_taken" | "ended";
+export type VerificationMethod =
+  | "claim_api"
+  | "distributor_program"
+  | "manual_verified"
+  | "unverified";
 
 export type PastAirdrop = {
   signature: string;
@@ -13,6 +20,8 @@ export type PastAirdrop = {
   senderAddress: string | null;
   isLikelyAirdrop: boolean;
   reason: string;
+  confidence: number;
+  usdValue?: number;
 };
 export type SafetyGrade = "safe" | "caution" | "risky";
 
@@ -27,6 +36,13 @@ export type WalletProfile = {
   address: string;
   solBalance: number;
   tokenSymbols: string[];
+  tokenMints: string[];
+  tokenBalances: Array<{
+    mint: string;
+    symbol: string;
+    uiAmount: number;
+    decimals: number;
+  }>;
   tokenAccountsCount: number;
   nftApproxCount: number;
   recentTransactionCount: number;
@@ -39,12 +55,20 @@ export type AirdropRule = {
   project: string;
   network: "solana";
   category: "defi" | "nft" | "infrastructure" | "consumer";
-  status: "upcoming" | "active" | "snapshot_taken" | "ended";
+  status: AirdropLifecycleStatus;
   officialClaimUrl: string;
   sourceUrl: string;
   trustedDomains?: string[];
   timeline?: AirdropTimeline;
   riskLevel: "low" | "medium" | "high";
+  verificationMethod?: VerificationMethod;
+  distributorProgramId?: string;
+  claimApiEndpoint?: string;
+  snapshotProofType?: string;
+  lastVerifiedAt?: string;
+  sourceConfidence?: number;
+  verificationConfig?: Record<string, unknown>;
+  verified?: boolean;
   estimatedValue?: string;
   description?: string;
   tags?: string[];
@@ -56,6 +80,14 @@ export type AirdropRule = {
     minNftCount?: number;
     maxLastActiveDays?: number;
   };
+};
+
+export type AirdropClaimableAmount = {
+  mint?: string;
+  symbol: string;
+  uiAmount: number;
+  usdValue?: number;
+  verified: boolean;
 };
 
 export type AirdropEvaluation = {
@@ -70,6 +102,11 @@ export type AirdropEvaluation = {
   officialClaimUrl: string;
   sourceUrl: string;
   riskLevel: AirdropRule["riskLevel"];
+  verificationMethod: VerificationMethod;
+  verified: boolean;
+  claimActionEnabled: boolean;
+  claimableAmounts?: AirdropClaimableAmount[];
+  verifiedUsdTotal?: number;
   estimatedValue?: string;
   description?: string;
   tags?: string[];

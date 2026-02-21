@@ -1,0 +1,15 @@
+[
+  {
+    "id": "jupiter-ecosystem-s2",
+    "project": "Jupiter Exchange",
+    "network": "solana",
+    "category": "defi",
+    "status": "upcoming",
+    "official_claim_url": "https://jup.ag",
+    "source_url": "https://x.com/JupiterExchange",
+    "risk_level": "low",
+    "verification_method": "unverified",
+    "source_confidence": 0.6,
+    "checks": {}
+  }
+]

@@ -33,6 +33,10 @@ const initialForm = {
   category: "defi",
   status: "upcoming",
   riskLevel: "medium",
+  verificationMethod: "unverified",
+  claimApiEndpoint: "",
+  snapshotProofType: "",
+  sourceConfidence: "0.5",
   officialClaimUrl: "",
   sourceUrl: "",
   checksJson: '{"minRecentTransactions": 10}',
@@ -122,6 +126,10 @@ export default function AdminPage() {
         category: form.category,
         status: form.status,
         riskLevel: form.riskLevel,
+        verificationMethod: form.verificationMethod,
+        claimApiEndpoint: form.claimApiEndpoint || undefined,
+        snapshotProofType: form.snapshotProofType || undefined,
+        sourceConfidence: Number(form.sourceConfidence),
         officialClaimUrl: form.officialClaimUrl,
         sourceUrl: form.sourceUrl,
         checks,
@@ -180,6 +188,27 @@ export default function AdminPage() {
             <option value="medium">medium</option>
             <option value="high">high</option>
           </select>
+          <select value={form.verificationMethod} onChange={(e) => setForm((s) => ({ ...s, verificationMethod: e.target.value }))}>
+            <option value="unverified">unverified</option>
+            <option value="manual_verified">manual_verified</option>
+            <option value="claim_api">claim_api</option>
+            <option value="distributor_program">distributor_program</option>
+          </select>
+          <input
+            placeholder="claim API endpoint (optional)"
+            value={form.claimApiEndpoint}
+            onChange={(e) => setForm((s) => ({ ...s, claimApiEndpoint: e.target.value }))}
+          />
+          <input
+            placeholder="snapshot proof type (optional)"
+            value={form.snapshotProofType}
+            onChange={(e) => setForm((s) => ({ ...s, snapshotProofType: e.target.value }))}
+          />
+          <input
+            placeholder="source confidence (0-1)"
+            value={form.sourceConfidence}
+            onChange={(e) => setForm((s) => ({ ...s, sourceConfidence: e.target.value }))}
+          />
           <input
             placeholder="official claim URL"
             value={form.officialClaimUrl}

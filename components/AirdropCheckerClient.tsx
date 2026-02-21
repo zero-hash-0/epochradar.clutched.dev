@@ -4,18 +4,27 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { AirdropEvaluation, WalletProfile } from "@/lib/types";
+import { AirdropEvaluation, PastAirdrop, WalletProfile } from "@/lib/types";
 import { AIRDROP_RULES } from "@/lib/airdrops";
 import StatusTabs from "@/components/StatusTabs";
 import AddressBook from "@/components/AddressBook";
-import { evaluateWalletAirdrops } from "@/lib/evaluator";
 import { drawShareCard } from "@/lib/shareCard";
+import { getProjectMeta } from "@/lib/projectMeta";
 
 /* ─── Types ─────────────────────────────────────────── */
 type ApiResponse = {
   checkedAt: string;
   profile: WalletProfile;
   results: AirdropEvaluation[];
+  activeAirdrops: AirdropEvaluation[];
+  upcomingAirdrops: AirdropEvaluation[];
+  endedAirdrops: AirdropEvaluation[];
+  pastAirdrops: PastAirdrop[];
+  totals: {
+    verifiedUsdTotal: number;
+    eligibleCount: number;
+    unknownCount: number;
+  };
   safety: { readOnly: boolean; privateKeysRequested: boolean; note: string };
 };
 type SolPriceResponse = { symbol: "SOL"; priceUsd: number; change24h: number; asOf: string };
@@ -23,8 +32,14 @@ type TickerItem = { id: string; title: string; url: string; sourceName: string }
 type WalletProfileGroup = { id: string; name: string; wallets: string[]; createdAt: string };
 type WalletScan = { address: string; ok: boolean; error?: string; eligibleCount: number; likelyCount: number };
 type GroupScanResult = { profileName: string; checkedAt: string; walletScans: WalletScan[]; aggregateResults: AirdropEvaluation[] };
+type LocalAccount = {
+  accountKey: string;
+  displayName: string;
+  avatarDataUrl?: string;
+};
 
 const PROFILES_KEY = "airdrop_wallet_profiles_v1";
+const LOCAL_ACCOUNT_KEY = "epochradar_local_account_v1";
 const NAV_TABS = ["Dashboard", "Airdrop Checker", "Address Book"] as const;
 type NavTab = (typeof NAV_TABS)[number];
 
@@ -69,12 +84,15 @@ export default function AirdropCheckerClient() {
   const [chartRange, setChartRange] = useState<"1M" | "1Y" | "ALL">("ALL");
   const [onlyEligible, setOnlyEligible] = useState(true);
   const [activeNav, setActiveNav] = useState<NavTab>("Airdrop Checker");
-  const [activeFilter, setActiveFilter] = useState<"All" | "Upcoming" | "Past" | "History">("All");
+  const [activeFilter, setActiveFilter] = useState<"Active" | "Upcoming" | "Past">("Active");
   const [showShare, setShowShare] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [shareDownloaded, setShareDownloaded] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [showInstall, setShowInstall] = useState(false);
+  const [localAccount, setLocalAccount] = useState<LocalAccount | null>(null);
+  const [accountNameInput, setAccountNameInput] = useState("");
+  const [accountKeyInput, setAccountKeyInput] = useState("");
   const shareCanvasRef = useRef<HTMLCanvasElement>(null);
   const [explorerFilter, setExplorerFilter] = useState<"all" | "defi" | "nft" | "infrastructure" | "consumer">("all");
 
@@ -91,6 +109,19 @@ export default function AirdropCheckerClient() {
         const raw = localStorage.getItem(PROFILES_KEY);
         if (raw) { const p = JSON.parse(raw) as WalletProfileGroup[]; if (Array.isArray(p)) setProfiles(p); }
       } catch { /* ignore */ }
+      try {
+        const rawAccount = localStorage.getItem(LOCAL_ACCOUNT_KEY);
+        if (rawAccount) {
+          const parsed = JSON.parse(rawAccount) as LocalAccount;
+          if (parsed.accountKey) {
+            setLocalAccount(parsed);
+            setAccountNameInput(parsed.displayName || "");
+            setAccountKeyInput(parsed.accountKey);
+          }
+        }
+      } catch {
+        // Non-blocking.
+      }
     }
   }, []);
 
@@ -98,6 +129,19 @@ export default function AirdropCheckerClient() {
     if (!mounted) return;
     try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch { /* ignore */ }
   }, [profiles, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      if (localAccount) {
+        localStorage.setItem(LOCAL_ACCOUNT_KEY, JSON.stringify(localAccount));
+      } else {
+        localStorage.removeItem(LOCAL_ACCOUNT_KEY);
+      }
+    } catch {
+      // Non-blocking.
+    }
+  }, [localAccount, mounted]);
 
   /* ── PWA install prompt ── */
   useEffect(() => {
@@ -141,40 +185,117 @@ export default function AirdropCheckerClient() {
 
   /* ── Demo profiles ── */
   const demoProfiles = useMemo(() => ({
-    builder: { address: "DemoBuilder1111111111111111111111111111111111", solBalance: 4.25, tokenSymbols: ["USDC", "JUP", "BONK", "DRFT"], tokenAccountsCount: 11, nftApproxCount: 3, recentTransactionCount: 72, accountAgeDays: 420, lastActiveDays: 2 },
-    newcomer: { address: "DemoNewbie11111111111111111111111111111111111", solBalance: 0.03, tokenSymbols: ["USDC"], tokenAccountsCount: 1, nftApproxCount: 0, recentTransactionCount: 4, accountAgeDays: 16, lastActiveDays: 1 },
+    builder: {
+      address: "DemoBuilder1111111111111111111111111111111111",
+      solBalance: 4.25,
+      tokenSymbols: ["USDC", "JUP", "BONK", "DRIFT"],
+      tokenMints: [],
+      tokenBalances: [],
+      tokenAccountsCount: 11,
+      nftApproxCount: 3,
+      recentTransactionCount: 72,
+      accountAgeDays: 420,
+      lastActiveDays: 2,
+    },
+    newcomer: {
+      address: "DemoNewbie11111111111111111111111111111111111",
+      solBalance: 0.03,
+      tokenSymbols: ["USDC"],
+      tokenMints: [],
+      tokenBalances: [],
+      tokenAccountsCount: 1,
+      nftApproxCount: 0,
+      recentTransactionCount: 4,
+      accountAgeDays: 16,
+      lastActiveDays: 1,
+    },
   }), []);
 
   /* ── Active results ── */
-  const activeResults = groupScan ? groupScan.aggregateResults : data?.results ?? [];
+  const activeResults = groupScan ? groupScan.aggregateResults : data?.activeAirdrops ?? [];
+  const upcomingResults = data?.upcomingAirdrops ?? [];
+  const pastAirdrops = data?.pastAirdrops ?? [];
 
   /* ── Table rows ── */
   const tableRows = useMemo(() => {
+    if (activeFilter === "Past") {
+      return pastAirdrops.slice(0, 14).map((item) => {
+        const assetMeta = getProjectMeta(item.symbol);
+        return {
+          id: `${item.signature}-${item.mint}`,
+          project: item.symbol,
+          asset: item.symbol,
+          assetIcon: assetMeta.iconUrl,
+          date: item.date,
+          status: item.isLikelyAirdrop ? "Detected" : "Observed",
+          isEligible: false,
+          claimEnabled: false,
+          claimUrl: "",
+          reason: item.reason,
+          amountText: Number(item.uiAmount.toFixed(6)).toString(),
+          usdText: typeof item.usdValue === "number" ? `$${item.usdValue.toFixed(2)}` : "—",
+          usdValue: item.usdValue || 0,
+          estimatedValue: "Already received",
+          verificationLabel: `Detected (${item.confidence}% confidence)`,
+        };
+      });
+    }
+
+    const sourceByFilter = activeFilter === "Upcoming" ? upcomingResults : activeResults;
+
     const source = onlyEligible
-      ? activeResults.filter((r) => r.status === "eligible" || r.status === "likely")
-      : activeResults;
-    return source.slice(0, 8).map((item, i) => {
-      const date = new Date(Date.now() - i * 86_400_000 * 3);
-      const amount = (item.confidence * (item.status === "eligible" ? 3.1 : 1.4)) / 10;
-      const usd = amount * (item.status === "eligible" ? 0.34 : 0.19);
+      ? sourceByFilter.filter((item) => item.status === "eligible")
+      : sourceByFilter;
+
+    return source.slice(0, 20).map((item, index) => {
+      const firstAmount = item.claimableAmounts?.[0];
+      const amountText =
+        firstAmount && firstAmount.uiAmount > 0 ? Number(firstAmount.uiAmount.toFixed(6)).toString() : "—";
+      const usdText = typeof item.verifiedUsdTotal === "number" && item.verifiedUsdTotal > 0
+        ? `$${item.verifiedUsdTotal.toFixed(2)}`
+        : "—";
+      const asset = firstAmount?.symbol || getProjectMeta(item.project).symbol;
+      const assetIcon = getProjectMeta(item.project).iconUrl;
+      const dateCandidate =
+        item.timeline?.claimOpensAt || item.timeline?.snapshotAt || item.timeline?.announcedAt || data?.checkedAt;
+      const parsedDate = dateCandidate ? new Date(dateCandidate) : new Date(Date.now() - index * 86400000);
+
       return {
-        id: item.id, project: item.project,
-        asset: item.project.slice(0, 3).toUpperCase(),
-        date: date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
-        status: item.status === "eligible" ? "Eligible" : item.status === "likely" ? "Likely" : "Review",
+        id: item.id,
+        project: item.project,
+        asset,
+        assetIcon,
+        date: parsedDate.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
+        status:
+          item.airdropStatus === "upcoming"
+            ? "Upcoming"
+            : item.status === "eligible"
+              ? "Eligible"
+              : item.status === "not_eligible"
+                ? "Not eligible"
+                : "Unknown",
         isEligible: item.status === "eligible",
-        amount, usd, claimUrl: item.officialClaimUrl,
-        estimatedValue: item.estimatedValue,
+        claimEnabled: item.claimActionEnabled,
+        claimUrl: item.officialClaimUrl,
+        reason: item.reason,
+        amountText,
+        usdText,
+        usdValue: item.verifiedUsdTotal || 0,
+        estimatedValue: item.estimatedValue || "TBD",
+        verificationLabel: item.verified ? "Verified" : "Unverified",
       };
     });
-  }, [activeResults, onlyEligible]);
+  }, [activeFilter, activeResults, data?.checkedAt, onlyEligible, pastAirdrops, upcomingResults]);
 
   const totalValue = useMemo(() => {
-    const v = tableRows.reduce((s, r) => s + r.usd, 0);
-    return v > 0 ? v : 46.16;
-  }, [tableRows]);
+    const verifiedUsd = tableRows.reduce((sum, row) => sum + row.usdValue, 0);
+    if (verifiedUsd > 0) {
+      return verifiedUsd;
+    }
+    return data?.totals?.verifiedUsdTotal || 0;
+  }, [data?.totals?.verifiedUsdTotal, tableRows]);
   const eligibleShareCount = useMemo(() => tableRows.filter((r) => r.isEligible).length, [tableRows]);
-  const likelyShareCount = useMemo(() => tableRows.filter((r) => r.status === "Likely").length, [tableRows]);
+  const unknownShareCount = useMemo(() => tableRows.filter((r) => r.status === "Unknown").length, [tableRows]);
 
   const summary = useMemo(() => {
     if (!data) return null;
@@ -189,9 +310,11 @@ export default function AirdropCheckerClient() {
   /* ── Chart ── */
   const chartSeries = useMemo(() => {
     const mult = chartRange === "1M" ? 0.56 : chartRange === "1Y" ? 0.82 : 1;
-    const vals = tableRows.length > 0 ? tableRows.map((r, i) => r.usd + i * 3.5) : [0, 12, 24, 36, 46.16];
+    const vals = tableRows.length > 0
+      ? tableRows.map((r) => r.usdValue)
+      : [0, 0, 0, 0, data?.totals?.verifiedUsdTotal || 0];
     return vals.map((v, i) => ({ x: i, y: Number((v * mult).toFixed(2)) }));
-  }, [tableRows, chartRange]);
+  }, [tableRows, chartRange, data?.totals?.verifiedUsdTotal]);
 
   const chartPolyline = useMemo(() => {
     const width = 520, height = 200, padLeft = 36, padRight = 12, padTop = 16, padBottom = 16;
@@ -223,7 +346,82 @@ export default function AirdropCheckerClient() {
 
   const runDemo = (profile: WalletProfile) => {
     setGroupScan(null);
-    setData({ checkedAt: new Date().toISOString(), profile, results: evaluateWalletAirdrops(profile, AIRDROP_RULES), safety: { readOnly: true, privateKeysRequested: false, note: "Demo mode — sample wallet profile." } });
+    const demoResults: AirdropEvaluation[] = AIRDROP_RULES.slice(0, 5).map((rule, index) => ({
+      id: rule.id,
+      project: rule.project,
+      status: "unknown",
+      confidence: 0,
+      reason: "Demo profile uses unknown status until project provider is configured.",
+      network: rule.network,
+      category: rule.category,
+      airdropStatus: rule.status,
+      officialClaimUrl: rule.officialClaimUrl,
+      sourceUrl: rule.sourceUrl,
+      riskLevel: rule.riskLevel,
+      verificationMethod: "unverified",
+      verified: false,
+      claimActionEnabled: false,
+      claimableAmounts: [],
+      verifiedUsdTotal: undefined,
+      estimatedValue: rule.estimatedValue,
+      description: rule.description,
+      tags: rule.tags,
+      timeline: rule.timeline,
+      proof: { met: [], unmet: ["Demo mode"] },
+      claimSafety: {
+        grade: "caution",
+        reasons: ["Demo mode"],
+        hostname: new URL(rule.officialClaimUrl).hostname,
+      },
+    }));
+    setData({
+      checkedAt: new Date().toISOString(),
+      profile,
+      results: demoResults,
+      activeAirdrops: demoResults.filter((item) => item.airdropStatus === "active" || item.airdropStatus === "snapshot_taken"),
+      upcomingAirdrops: demoResults.filter((item) => item.airdropStatus === "upcoming"),
+      endedAirdrops: demoResults.filter((item) => item.airdropStatus === "ended"),
+      pastAirdrops: [
+        {
+          signature: "demo-1",
+          date: new Date().toLocaleDateString(),
+          timestamp: Date.now(),
+          mint: "DemoMint111111111111111111111111111111111111",
+          mintShort: "DemoMi...",
+          symbol: "USDC",
+          amount: 2000000,
+          decimals: 6,
+          uiAmount: 2,
+          senderAddress: null,
+          isLikelyAirdrop: true,
+          reason: "Detected airdrop: Demo sample",
+          confidence: 80,
+          usdValue: 2,
+        },
+        {
+          signature: "demo-2",
+          date: new Date().toLocaleDateString(),
+          timestamp: Date.now() - 86400000,
+          mint: "DemoMint222222222222222222222222222222222222",
+          mintShort: "DemoMi...",
+          symbol: "JUP",
+          amount: 350000000,
+          decimals: 6,
+          uiAmount: 350,
+          senderAddress: null,
+          isLikelyAirdrop: true,
+          reason: "Detected airdrop: Demo sample",
+          confidence: 78,
+          usdValue: 20,
+        },
+      ],
+      totals: {
+        verifiedUsdTotal: 0,
+        eligibleCount: 0,
+        unknownCount: demoResults.length,
+      },
+      safety: { readOnly: true, privateKeysRequested: false, note: "Demo mode — sample wallet profile." },
+    });
     setError(null);
   };
 
@@ -280,7 +478,7 @@ export default function AirdropCheckerClient() {
     void drawShareCard(canvas, {
       walletAddress,
       eligibleCount: eligible.length,
-      likelyCount: likelyShareCount,
+      likelyCount: unknownShareCount,
       totalValue,
       topAirdrops: tableRows.slice(0, 4).map((r) => ({
         project: r.project,
@@ -294,7 +492,7 @@ export default function AirdropCheckerClient() {
     return () => {
       cancelled = true;
     };
-  }, [showShare, tableRows, totalValue, walletAddress, solPrice, likelyShareCount]);
+  }, [showShare, tableRows, totalValue, walletAddress, solPrice, unknownShareCount]);
 
   const downloadShareCard = () => {
     const canvas = shareCanvasRef.current;
@@ -322,6 +520,47 @@ export default function AirdropCheckerClient() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (deferredPrompt as any).prompt?.();
     setDeferredPrompt(null); setShowInstall(false);
+  };
+
+  const createLocalAccount = () => {
+    const random = crypto.getRandomValues(new Uint8Array(16));
+    const key = `er_${Array.from(random).map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+    const next: LocalAccount = {
+      accountKey: key,
+      displayName: accountNameInput.trim() || "EpochRadar User",
+      avatarDataUrl: localAccount?.avatarDataUrl,
+    };
+    setLocalAccount(next);
+    setAccountKeyInput(key);
+  };
+
+  const importLocalAccountKey = () => {
+    const key = accountKeyInput.trim();
+    if (!key || key.length < 8) {
+      setError("Account key is too short.");
+      return;
+    }
+    setLocalAccount({
+      accountKey: key,
+      displayName: accountNameInput.trim() || "EpochRadar User",
+      avatarDataUrl: localAccount?.avatarDataUrl,
+    });
+    setError(null);
+  };
+
+  const onAccountAvatarUpload = async (file: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : "";
+      if (!dataUrl) return;
+      setLocalAccount((prev) => ({
+        accountKey: prev?.accountKey || accountKeyInput || "pending",
+        displayName: accountNameInput.trim() || prev?.displayName || "EpochRadar User",
+        avatarDataUrl: dataUrl,
+      }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const saveProfile = () => {
@@ -375,7 +614,7 @@ export default function AirdropCheckerClient() {
                 <div className="share-scene-stats">
                   <span><strong>${totalValue.toFixed(2)}</strong> total value</span>
                   <span><strong>{eligibleShareCount}</strong> eligible</span>
-                  <span><strong>{likelyShareCount}</strong> likely</span>
+                  <span><strong>{unknownShareCount}</strong> unknown</span>
                 </div>
               </div>
             </section>
@@ -571,6 +810,46 @@ export default function AirdropCheckerClient() {
                   </div>
                   {walletAddress && <p className="wallet-address">Wallet: {walletAddress}</p>}
                   {error && <p className="error">{error}</p>}
+                  <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: 12, padding: 10, background: "var(--surface-2)" }}>
+                    <p style={{ margin: "0 0 8px 0", fontSize: 12, color: "var(--muted)" }}>Account (no phone/email)</p>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <input
+                        className="ab-input"
+                        placeholder="Display name"
+                        value={accountNameInput}
+                        onChange={(e) => setAccountNameInput(e.target.value)}
+                      />
+                      <input
+                        className="ab-input ab-input-mono"
+                        placeholder="Account key"
+                        value={accountKeyInput}
+                        onChange={(e) => setAccountKeyInput(e.target.value)}
+                      />
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button type="button" className="ghost-btn" onClick={createLocalAccount}>Create key</button>
+                        <button type="button" className="ghost-btn" onClick={importLocalAccountKey}>Use key</button>
+                      </div>
+                      <label style={{ fontSize: 12, color: "var(--muted)" }}>
+                        Profile picture
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "block", marginTop: 6 }}
+                          onChange={(e) => onAccountAvatarUpload(e.target.files?.[0] || null)}
+                        />
+                      </label>
+                      {localAccount && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {localAccount.avatarDataUrl ? (
+                            <img src={localAccount.avatarDataUrl} alt="Account avatar" width={26} height={26} style={{ borderRadius: 999 }} />
+                          ) : (
+                            <span style={{ width: 26, height: 26, borderRadius: 999, background: "var(--surface)", border: "1px solid var(--border)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>👤</span>
+                          )}
+                          <span style={{ fontSize: 12, color: "var(--ink)" }}>{localAccount.displayName}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Right: chart */}
@@ -613,7 +892,7 @@ export default function AirdropCheckerClient() {
               <div className="board-bottom">
                 <div className="board-filters-row">
                   <div className="board-filter-tabs">
-                    {(["All", "Upcoming", "Past", "History"] as const).map((f) => (
+                    {(["Active", "Upcoming", "Past"] as const).map((f) => (
                       <button key={f} type="button" className={`board-pill ${activeFilter === f ? "board-pill-active" : ""}`} onClick={() => setActiveFilter(f)}>{f}</button>
                     ))}
                   </div>
@@ -626,28 +905,40 @@ export default function AirdropCheckerClient() {
                 )}
                 <div className="board-table-wrap">
                   <table className="board-table">
-                    <thead><tr><th>Date</th><th>Airdrop</th><th>Asset</th><th>Est. Value</th><th>Status</th><th>Amount</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Airdrop</th><th>Asset</th><th>Value</th><th>Status</th><th>Amount / USD</th><th>Action</th></tr></thead>
                     <tbody>
                       {tableRows.length === 0 ? (
                         <tr><td colSpan={7} style={{ textAlign: "center", color: "var(--muted)", padding: "32px 14px" }}>
-                          {data || groupScan ? "No eligible airdrops found." : "Connect your wallet or try a demo to see results."}
+                          {data || groupScan ? "No rows for this filter yet." : "Connect your wallet or try a demo to see results."}
                         </td></tr>
                       ) : tableRows.map((row) => (
                         <tr key={row.id}>
                           <td className="col-date">{row.date}</td>
                           <td style={{ fontWeight: 500 }}>{row.project}</td>
                           <td>
-                            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 6, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 10, fontWeight: 700, color: "var(--muted)" }}>
-                              {row.asset}
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                              <img
+                                src={row.assetIcon}
+                                alt={row.asset}
+                                width={20}
+                                height={20}
+                                style={{ borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
+                              />
+                              <span style={{ fontSize: 11, color: "var(--muted)" }}>{row.asset}</span>
                             </span>
                           </td>
-                          <td style={{ color: "var(--brand)", fontWeight: 500, fontSize: 12 }}>{row.estimatedValue ?? "TBD"}</td>
-                          <td>
-                            <span className={`pill ${row.status === "Eligible" ? "pill-eligible" : row.status === "Likely" ? "pill-likely" : "pill-unknown"}`}>{row.status}</span>
+                          <td style={{ color: "var(--brand)", fontWeight: 500, fontSize: 12 }}>
+                            {row.usdText === "—" ? row.estimatedValue : row.usdText}
                           </td>
-                          <td><span>{row.amount.toFixed(2)} {row.asset}</span><small>${row.usd.toFixed(2)}</small></td>
                           <td>
-                            {row.isEligible
+                            <div style={{ display: "grid", gap: 4 }}>
+                              <span className={`pill ${row.status === "Eligible" ? "pill-eligible" : row.status === "Unknown" ? "pill-unknown" : "pill-likely"}`}>{row.status}</span>
+                              <span style={{ fontSize: 10, color: "var(--muted)" }}>{row.verificationLabel}</span>
+                            </div>
+                          </td>
+                          <td><span>{row.amountText} {row.asset}</span><small>{row.usdText}</small></td>
+                          <td>
+                            {row.claimEnabled
                               ? <a href={row.claimUrl} target="_blank" rel="noreferrer" className="board-action-claim">Claim ↗</a>
                               : <button type="button" className="board-action-track">Track</button>
                             }

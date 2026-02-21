@@ -6,11 +6,13 @@ Connect a Solana wallet and run a read-only eligibility scan against configurabl
 
 - Wallet connect (Phantom, Solflare)
 - Read-only wallet profile fetch from Solana RPC
-- Eligibility scoring engine with starter rules
-- Accessible status tabs (`all`, `eligible`, `likely`, `not_eligible`, `unknown`)
+- Provider-based eligibility engine (`claim_api`, `manual_verified`, `unverified`)
+- Explicit `Past / Active / Upcoming` views with verified/unverified labels
 - Safety UI to discourage phishing/seed phrase scams
 - Supabase-backed admin API + `/admin` rules manager
 - Discovery radar that scans Solana ecosystem feeds for new opportunities
+- Token metadata resolution (Jupiter token list + on-chain metadata fallback + cache)
+- Past airdrop detection scanner from transaction history
 
 ## Quick start
 
@@ -43,11 +45,21 @@ Then open `http://localhost:3000`.
 
 - This app only reads public on-chain data.
 - It does not sign transactions or execute claims.
-- Always verify claim URLs from official project channels.
+- Claim buttons are only enabled when eligibility is provider-verified and the claim URL host is trusted.
+- Unsupported projects are intentionally shown as `unknown` (no fake eligibility guesses).
 
 ## Extend rules
 
-Edit `lib/airdrops.ts` and adjust check logic in `lib/evaluator.ts`.
+Edit `lib/airdrops.ts` (fallback) or your Supabase `airdrops` table (canonical registry).
+
+### Add a new provider
+
+1. Add/update a row with `verification_method` and optional `claim_api_endpoint`.
+2. Add provider logic in `/Users/hectorruiz/Documents/New project/solana-airdrop-checker-web/lib/airdropProviders/providers.ts`.
+3. Keep unsupported projects as `unverified` so they return `unknown` instead of guessed eligibility.
+
+Provider interface lives in:
+- `/Users/hectorruiz/Documents/New project/solana-airdrop-checker-web/lib/airdropProviders/types.ts`
 
 To use Supabase persistence:
 
@@ -60,6 +72,28 @@ To use Supabase persistence:
 - Open `/admin` and use `Run scan now` for manual scans.
 - Schedule `GET /api/cron/discovery` with `Authorization: Bearer <CRON_SECRET>` hourly.
 - Discovery is high-coverage, not exhaustive. Always verify claim URLs before publishing.
+
+## Registry pipeline
+
+`airdrops` is the canonical registry in Supabase.
+
+New registry columns:
+- `verification_method`
+- `distributor_program_id`
+- `claim_api_endpoint`
+- `snapshot_proof_type`
+- `last_verified_at`
+- `source_confidence`
+- `verification_config`
+
+Import/update curated registry entries:
+
+```bash
+npm run registry:import
+```
+
+Default import source is:
+- `/Users/hectorruiz/Documents/New project/solana-airdrop-checker-web/scripts/curated-airdrops.json`
 
 ## Admin & security
 

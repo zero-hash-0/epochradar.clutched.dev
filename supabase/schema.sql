@@ -8,12 +8,27 @@ create table if not exists public.airdrops (
   status text not null check (status in ('upcoming', 'active', 'snapshot_taken', 'ended')),
   official_claim_url text not null,
   source_url text not null,
+  verification_method text not null default 'unverified' check (verification_method in ('claim_api', 'distributor_program', 'manual_verified', 'unverified')),
+  distributor_program_id text,
+  claim_api_endpoint text,
+  snapshot_proof_type text,
+  last_verified_at timestamptz,
+  source_confidence numeric not null default 0.5,
+  verification_config jsonb not null default '{}'::jsonb,
   risk_level text not null check (risk_level in ('low', 'medium', 'high')),
   checks jsonb not null default '{}'::jsonb,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.airdrops add column if not exists verification_method text default 'unverified';
+alter table public.airdrops add column if not exists distributor_program_id text;
+alter table public.airdrops add column if not exists claim_api_endpoint text;
+alter table public.airdrops add column if not exists snapshot_proof_type text;
+alter table public.airdrops add column if not exists last_verified_at timestamptz;
+alter table public.airdrops add column if not exists source_confidence numeric default 0.5;
+alter table public.airdrops add column if not exists verification_config jsonb default '{}'::jsonb;
 
 create or replace function public.set_updated_at()
 returns trigger as $$

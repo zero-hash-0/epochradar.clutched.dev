@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "echo \"TypeScript unit tests are in lib/__tests__\"",
+    "registry:import": "node scripts/import-airdrops.mjs"
   },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.26",

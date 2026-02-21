@@ -125,7 +125,7 @@ export default function StatusTabs({ results, shareBaseUrl }: Props) {
                   <span className={`pill pill-${item.status}`}>{item.status.replaceAll("_", " ")}</span>
                 </div>
                 <p className="meta-row">
-                  {tierLabel(item.status)} | {item.category} | {item.airdropStatus} | confidence {item.confidence}%
+                  {tierLabel(item.status)} | {item.category} | {item.airdropStatus} | {item.verified ? "Verified" : "Unverified"} | confidence {item.confidence}%
                 </p>
                 <p className="reason">{item.reason}</p>
                 <div className="proof-panel" aria-label="Proof of match">
