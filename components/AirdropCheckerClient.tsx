@@ -40,7 +40,7 @@ type LocalAccount = {
 
 const PROFILES_KEY = "airdrop_wallet_profiles_v1";
 const LOCAL_ACCOUNT_KEY = "epochradar_local_account_v1";
-const NAV_TABS = ["Dashboard", "Airdrop Checker", "Address Book"] as const;
+const NAV_TABS = ["Dashboard", "Checker", "Address Book"] as const;
 type NavTab = (typeof NAV_TABS)[number];
 
 const AVATAR_COLORS = ["#14f195", "#23d3ff", "#9945ff", "#f97316", "#ec4899"];
@@ -73,7 +73,7 @@ export default function AirdropCheckerClient() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [solPrice, setSolPrice] = useState<SolPriceResponse | null>(null);
   const [tickerItems, setTickerItems] = useState<TickerItem[]>(STATIC_TICKER);
-  const [shareBaseUrl, setShareBaseUrl] = useState("https://epochradar.com");
+  const [shareBaseUrl, setShareBaseUrl] = useState("https://clutched.dev");
   const [profiles, setProfiles] = useState<WalletProfileGroup[]>([]);
   const [newProfileName, setNewProfileName] = useState("");
   const [newWalletAddress, setNewWalletAddress] = useState("");
@@ -83,7 +83,7 @@ export default function AirdropCheckerClient() {
   const [groupScan, setGroupScan] = useState<GroupScanResult | null>(null);
   const [chartRange, setChartRange] = useState<"1M" | "1Y" | "ALL">("ALL");
   const [onlyEligible, setOnlyEligible] = useState(true);
-  const [activeNav, setActiveNav] = useState<NavTab>("Airdrop Checker");
+  const [activeNav, setActiveNav] = useState<NavTab>("Checker");
   const [activeFilter, setActiveFilter] = useState<"Active" | "Upcoming" | "Past">("Active");
   const [showShare, setShowShare] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -104,7 +104,7 @@ export default function AirdropCheckerClient() {
   useEffect(() => {
     setMounted(true);
     if (typeof window !== "undefined") {
-      setShareBaseUrl(window.location.origin);
+      setShareBaseUrl("https://clutched.dev");
       try {
         const raw = localStorage.getItem(PROFILES_KEY);
         if (raw) { const p = JSON.parse(raw) as WalletProfileGroup[]; if (Array.isArray(p)) setProfiles(p); }
@@ -655,7 +655,10 @@ export default function AirdropCheckerClient() {
           </span>
           <div className="nav-tabs">
             {NAV_TABS.map((tab) => (
-              <button key={tab} type="button" className={`nav-tab ${activeNav === tab ? "nav-tab-active" : ""}`} onClick={() => setActiveNav(tab)}>
+              <button key={tab} type="button" className={`nav-tab ${activeNav === tab ? "nav-tab-active" : ""}`} onClick={() => {
+                logTap(`top-nav-${tab}`);
+                setActiveNav(tab);
+              }}>
                 {tab}
               </button>
             ))}
@@ -775,7 +778,7 @@ export default function AirdropCheckerClient() {
         {/* ════════════════════════════════════════════
             AIRDROP CHECKER TAB
         ════════════════════════════════════════════ */}
-        {activeNav === "Airdrop Checker" && (
+        {activeNav === "Checker" && (
           <>
             {/* ── Portfolio board ── */}
             <section className="portfolio-board">
@@ -792,21 +795,21 @@ export default function AirdropCheckerClient() {
                   </p>
 
                   <div className="board-actions">
-                    <button type="button" className="share-btn" onClick={handleShare}>↗ Share it!</button>
-                    <button type="button" className="wallet-select-btn">
+                    <button type="button" className="share-btn" onClick={() => { logTap("share"); void handleShare(); }}>↗ Share it!</button>
+                    <button type="button" className="wallet-select-btn" onClick={() => logTap("wallet-select")}>
                       {walletAddress ? `${shortAddr(walletAddress)} ▾` : "1 wallet ▾"}
                     </button>
                   </div>
 
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-                    <button type="button" className="check-btn" onClick={runCheck} disabled={!connected || loading}>
+                    <button type="button" className="check-btn" onClick={() => { logTap("check-eligibility"); void runCheck(); }} disabled={!connected || loading}>
                       {loading ? "Checking…" : "Check Eligibility"}
                     </button>
                   </div>
 
                   <div className="demo-row">
-                    <button type="button" className="ghost-btn" onClick={() => runDemo(demoProfiles.builder)}>Demo: Builder</button>
-                    <button type="button" className="ghost-btn" onClick={() => runDemo(demoProfiles.newcomer)}>Demo: Newcomer</button>
+                    <button type="button" className="ghost-btn" onClick={() => { logTap("demo-builder"); runDemo(demoProfiles.builder); }}>Demo: Builder</button>
+                    <button type="button" className="ghost-btn" onClick={() => { logTap("demo-newcomer"); runDemo(demoProfiles.newcomer); }}>Demo: Newcomer</button>
                   </div>
                   {walletAddress && <p className="wallet-address">Wallet: {walletAddress}</p>}
                   {error && <p className="error">{error}</p>}
@@ -881,7 +884,7 @@ export default function AirdropCheckerClient() {
                   </svg>
                   <div className="board-toggle">
                     <span>Only eligible</span>
-                    <button type="button" className={`toggle-switch ${onlyEligible ? "toggle-on" : ""}`} onClick={() => setOnlyEligible((p) => !p)} aria-pressed={onlyEligible}>
+                    <button type="button" className={`toggle-switch ${onlyEligible ? "toggle-on" : ""}`} onClick={() => { logTap("toggle-only-eligible"); setOnlyEligible((p) => !p); }} aria-pressed={onlyEligible}>
                       <span />
                     </button>
                   </div>
@@ -893,7 +896,10 @@ export default function AirdropCheckerClient() {
                 <div className="board-filters-row">
                   <div className="board-filter-tabs">
                     {(["Active", "Upcoming", "Past"] as const).map((f) => (
-                      <button key={f} type="button" className={`board-pill ${activeFilter === f ? "board-pill-active" : ""}`} onClick={() => setActiveFilter(f)}>{f}</button>
+                      <button key={f} type="button" className={`board-pill ${activeFilter === f ? "board-pill-active" : ""}`} onClick={() => {
+                        logTap(`filter-${f}`);
+                        setActiveFilter(f);
+                      }}>{f}</button>
                     ))}
                   </div>
                 </div>
@@ -939,8 +945,8 @@ export default function AirdropCheckerClient() {
                           <td><span>{row.amountText} {row.asset}</span><small>{row.usdText}</small></td>
                           <td>
                             {row.claimEnabled
-                              ? <a href={row.claimUrl} target="_blank" rel="noreferrer" className="board-action-claim">Claim ↗</a>
-                              : <button type="button" className="board-action-track">Track</button>
+                              ? <a href={row.claimUrl} target="_blank" rel="noreferrer" className="board-action-claim" onClick={() => logTap(`claim-${row.project}`)}>Claim ↗</a>
+                              : <button type="button" className="board-action-track" onClick={() => logTap(`track-${row.project}`)}>Track</button>
                             }
                           </td>
                         </tr>
@@ -1085,6 +1091,31 @@ export default function AirdropCheckerClient() {
           <a href="https://x.com/notT0KY0" target="_blank" rel="noreferrer">@notT0KY0</a>
         </footer>
       </main>
+
+      <nav className="mobile-dock" aria-label="Mobile Navigation">
+        {NAV_TABS.map((tab) => {
+          const active = activeNav === tab;
+          const icon = tab === "Dashboard" ? "⌂" : tab === "Checker" ? "◎" : "☰";
+          return (
+            <button
+              key={`dock-${tab}`}
+              type="button"
+              className={`mobile-dock-item ${active ? "mobile-dock-item-active" : ""}`}
+              onClick={() => {
+                logTap(`mobile-dock-${tab}`);
+                setActiveNav(tab);
+              }}
+            >
+              <span className="mobile-dock-icon" aria-hidden="true">{icon}</span>
+              {active && <span className="mobile-dock-label">{tab}</span>}
+            </button>
+          );
+        })}
+      </nav>
     </>
   );
 }
+  const logTap = (label: string) => {
+    // Temporary click telemetry for interaction verification.
+    console.info(`[RADAR CTA] ${label}`);
+  };
